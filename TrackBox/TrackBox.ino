@@ -22,8 +22,8 @@ const long repeatDelay = 5000;
 int nameOffset = 64;                     // the pin where the phototransistor is connected to
 const int NAMEOFFSETY = 24;
 const char *naam = "Ger Baron  •  Ger Baron  •  ";
-const char *voornaam = "Ger";
-const char *achternaam = "Baron";
+const char *voornaam = "Ger ";
+const char *achternaam = "Baron    ";
 
 // necessary for microchip library
 void spin(int16_t lowVal, int16_t highVal, int16_t stepSize,
@@ -39,16 +39,16 @@ void setup() {
   uView.begin();
   setupMainDisplay();
 //  setNameLabelAt(56, NAMEOFFSETY, voornaam);
-//  setNameLabelAt(-8, NAMEOFFSETY + 12, achternaam);
+//  setNameLabelAt(-8, NAMEOFFSETY + 16, achternaam);
   lastTime = millis();
 }
 
 void loop() {
   if (nameOffset > 0) {
-    setNameLabelAt(nameOffset, NAMEOFFSETY, voornaam);
-    setNamePartLabelAt(nameOffset, NAMEOFFSETY + 12, achternaam);
+//    setNameLabelAt(nameOffset, NAMEOFFSETY, voornaam);
+    showNamePartLabelFromRightAt( nameOffset, NAMEOFFSETY, voornaam);
+    showNamePartLabelFromLeftAt(  nameOffset, NAMEOFFSETY + 12, achternaam);
 
-//    setNameLabelAt( 8 - nameOffset, NAMEOFFSETY + 12, achternaam);
     nameOffset--;
     if (nameOffset == 0) {
       lastTime = millis() + repeatDelay;
@@ -84,7 +84,29 @@ void setNameLabelAt(int offsetx, int offsety, char *name)
 }
 
 #define CHARWIDTH 8
-void setNamePartLabelAt(int offsetx, int offsety, char *name)
+#define SCREENCHARS 8
+void showNamePartLabelFromRightAt(int offsetx, int offsety, char *name)
+{
+    char editName[20];
+
+    int len = (int) strlen(name);
+    int offset = offsetx / CHARWIDTH;
+    int charpos = ((SCREENCHARS * CHARWIDTH) - offsetx) / CHARWIDTH;
+    if (charpos > 0) {  // show chars
+        // int newoffset = - (offsetx % CHARWIDTH);
+        char *newName ;
+        if (charpos <= len) {
+          newName = strncpy(editName, name, charpos);
+        } else {
+          newName = strncpy(editName, name, len);
+        }
+        uView.setFontType(1);
+        uView.setCursor(offsetx, offsety);
+        uView.print(newName);
+    }
+}
+
+void showNamePartLabelFromLeftAt(int offsetx, int offsety, char *name)
 {
     int offset = offsetx / CHARWIDTH;
     int len = (int) strlen(name);
