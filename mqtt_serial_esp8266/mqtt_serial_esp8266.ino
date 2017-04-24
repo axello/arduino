@@ -97,12 +97,8 @@ void reconnect() {
       Serial.println("connected");
       // Once connected, publish an announcement...
       IPAddress ip = WiFi.localIP();
-      String ipstr = WiFi.localIP().toString();
-      int a = ip[0];
-      int b = ip[1];
-      int c = ip[2];
-      int d = ip[3];
-      snprintf (msg, 75, "hello world from %d.%d.%d.%d = '%s'", a,b,c,d, ipstr.c_str() );
+      String ipstr = ip.toString();
+      snprintf (msg, 75, "hello world from %s", ipstr.c_str() );
       client.publish("tele", msg);
       // ... and resubscribe
       client.subscribe("inTopic");
@@ -125,37 +121,35 @@ void loop() {
 
   long now = millis();
   if (Serial.available()) {
+     char waste = Serial.peek();
+     if (waste < 0) {
+        Serial.println("empty serial buffer");
+     } else if (waste == 0x0A || waste == 0x0D) {
+        waste = Serial.read();
+        Serial.print(String(waste, HEX));
+     }
+
      Serial.print("Serial input: ");
    
-    buf = Serial.readStringUntil(0x0D);
-//    char waste = Serial.read();
-    char waste = Serial.peek();
-    if (waste >= 0 && waste == 0x0A) {
-      waste = Serial.read();
-      Serial.print("linefeed removed");
-    } else {
-      Serial.print("waarde:'");
-      Serial.print(int(waste));
-      Serial.println("'");
-    }
-    // Length (with one extra character for the null terminator)
-    int str_len = buf.length() + 1; 
-    // Prepare the character array (the buffer) 
-    char char_array[str_len];
-    // Copy it over 
-    buf.toCharArray(char_array, str_len);
-
-    client.publish("tele", char_array);
-    lastMsg = now;
+     buf = Serial.readStringUntil(0x0D);
+     if (buf.length() > 0) {
+       waste = Serial.peek();
+       if (waste >= 0 && waste == 0x0A) {
+          waste = Serial.read();
+       }
+       String newBuf = "'" + buf + "'";
+      client.publish("tele", newBuf.c_str());
+      lastMsg = now;
+     }
   } else {
 
-  if (now - lastMsg > 10000) {
-    lastMsg = now;
-    ++value;
-    snprintf (msg, 75, "hello world #%ld", value);
-    Serial.print("Publish message: ");
-    Serial.println(msg);
-    client.publish("tele", msg);
-  }
+//  if (now - lastMsg > 10000) {
+//    lastMsg = now;
+//    ++value;
+//    snprintf (msg, 75, "hello world #%ld", value);
+//    Serial.print("Publish message: ");
+//    Serial.println(msg);
+//    client.publish("tele", msg);
+//  }
   }
 }
