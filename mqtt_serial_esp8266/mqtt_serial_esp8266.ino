@@ -27,6 +27,9 @@
 #include <PubSubClient.h>
 #include "secrets.h"
 
+#define DOMOTICZ_IN_TOPIC      "domoticz/in"   // [DomoticzInTopic]
+#define DOMOTICZ_OUT_TOPIC     "domoticz/out"  // [DomoticzOutTopic]
+  
 // Update these with values suitable for your network.
 // moved to secrets.h
 //const char* ssid = "........";
@@ -41,7 +44,7 @@ int value = 0;
 
 void setup() {
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
-  Serial.begin(115200);
+  Serial.begin(9600);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
@@ -137,8 +140,10 @@ void loop() {
        if (waste >= 0 && waste == 0x0A) {
           waste = Serial.read();
        }
-       String newBuf = "'" + buf + "'";
-      client.publish("tele", newBuf.c_str());
+       buf.replace(',',';');
+       String newBuf = "{\"idx\":24,\"nvalue\":0,\"svalue\":\"" + buf + "\"}";
+
+      client.publish(DOMOTICZ_IN_TOPIC, newBuf.c_str());
       lastMsg = now;
      }
   } else {
