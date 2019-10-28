@@ -8,7 +8,9 @@
 /*
  * 7 segment stuff
  */
+#define SEGMENT7  0
 
+#if SEGMENT7
 const int clock = 5; //SCK
 const int latch = 6; //RCK
 const int data = 7;  //DIO
@@ -28,59 +30,97 @@ byte value[] = { B11000000, // 0
 
 byte segments[8];
 int decimalPoint = 8;
+#endif
 
 /* 
  *  waterflow meter stuff
  */
-int meter1 = 2;
-int meter2 = 3;
-volatile unsigned int pulse1;
-volatile unsigned int pulse2;
+const int meter1 = 2;
+const int meter2 = 3;
+const int displaySwitch = 8;
+
+volatile unsigned long int pulse1;
+volatile unsigned long int pulse2;
 
 const int pulses_per_litre = 450;
 unsigned long currentTime;
 unsigned long cloopTime;
 unsigned long totalLiters = 0;
 
-const int reportMillis = 1000;
+const int reportMillis = 10000;     // every 10 seconds / minute is good enough!
 
 void setup()
 {
   Serial.begin(57600);
-  setUpDisplay();
 
-  pinMode(meter1, INPUT);
-  pinMode(meter2, INPUT);
-  attachInterrupt(digitalPinToInterrupt(meter1), count_pulse, RISING);
+#if SEGMENT7
+  setUpDisplay();
+#endif
+
+  pinMode(meter1, INPUT_PULLUP);
+  pinMode(meter2, INPUT_PULLUP);
+  pinMode(displaySwitch, INPUT_PULLUP);
+  
+  attachInterrupt(digitalPinToInterrupt(meter1), count_pulse1, RISING);
+  attachInterrupt(digitalPinToInterrupt(meter2), count_pulse2, RISING);
 
   currentTime = millis();
   cloopTime = currentTime;
+  Serial.println("{\"startup\" : [\"metera\", \"meterb\"]}");
 }
 
 void loop()
 {
   pulse1 = 0;
+  pulse2 = 0;
+  unsigned int l_hour = 0;
   
   interrupts();
-  delay(1000);
+  delay(reportMillis);
   noInterrupts();
 
-  Serial.print("Pulses per second: ");
-  Serial.print(pulse1);
+  // meter A
+  if (pulse1 > 0) {
+    
+    // Serial.print("A pulses: ");
+    // Serial.println(pulse1);
+  
+    l_hour = (pulse1 * 60) / 6.6;    // pulses / sec * minute
+    totalLiters += l_hour;
+    
+    // Serial.print("A -->  liter/h: ");
+    // sprintf("\"metera\": {\"ppm\": %ul, \"lph\": %u}", pulse1, l_hour);
+    String text = "{\"metera\": {\"ppm\": " + String(pulse1) + ", \"lph\": " + String(l_hour) + "}}";
+    Serial.println(text);
+  }
+  // meter B
+  if (pulse2 > 0) {
+    //    Serial.print("B pulses per second: ");
+    // Serial.println(pulse2);
+  
+    l_hour = (pulse2 * 60) / 6.6;    // pulses / sec * minute
+    totalLiters += l_hour;
+    String text = "{\"meterb\": {\"ppm\": " + String(pulse2) + ", \"lph\": " + String(l_hour) + "}}";
+    // Serial.print("B -->  liter/h: ");
+    // Serial.println(l_hour);
+    Serial.println(text);
+ }
 
-  unsigned int l_hour = (pulse1 * 60) / 6.6;    // pulses / sec * minute
-  totalLiters += l_hour;
-  Serial.print(" -->  liter/h: ");
-  Serial.println(l_hour);
+#if SEGMENT7
   segmentsFromNumber(totalLiters);
-
+#endif
 }
 
-void count_pulse()                   // Interrupt function
+void count_pulse1()                   // Interrupt function
 {
   pulse1++;
 }
 
+
+void count_pulse2()                   // Interrupt function
+{
+  pulse2++;
+}
 
 
 /*
@@ -88,7 +128,7 @@ void count_pulse()                   // Interrupt function
  * 
  */
 
- 
+#if SEGMENT7
 void setUpDisplay() {
   pinMode(clock, OUTPUT);
   pinMode(latch, OUTPUT);
@@ -115,6 +155,7 @@ void setupDisplayTimer()
   sei();//allow interrupts
 }
 
+/* 7 segment display interupt service routine */
 ISR(TIMER0_COMPA_vect)
 {
   static byte ii = 0;
@@ -149,3 +190,4 @@ void segmentsFromNumber(long num) {
       segments[7 - j] = value;
     }
 }
+#endif
