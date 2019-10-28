@@ -156,7 +156,7 @@ void displaySetup() {
   void drawFrameWifiStatus(OLEDDisplay *display, String text, int16_t x, int16_t y) {
     display->clear();
     display->setTextAlignment(TEXT_ALIGN_CENTER);
-    display->setFont(Roboto_Condensed_Bold_Bold_16);
+    display->setFont(Roboto_Medium_Plain_12);
     // see http://blog.squix.org/2015/05/esp8266-nodemcu-how-to-create-xbm.html
     // on how to create xbm files
     display->drawXbm( x + (128 - WiFi_width) / 2, 0, WiFi_width, WiFi_height, WiFi_bits);

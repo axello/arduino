@@ -14,8 +14,6 @@
 #include "NeoPixel.h"
 #include "Drawdemo.h"
 
-FirebaseData firebaseData;
-
 const int debugPin = 4;
 
 /********************************
@@ -80,18 +78,40 @@ bool showErrorMessage() {
 }
 
 void wifiSetup() {
-   OLEDDisplayUiState state;
+  OLEDDisplayUiState state;
   OLEDDisplay *oled = (OLEDDisplay *) &display;
- 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
-  drawFrameWifiConnecting(oled);
 
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(300);
-  }
+  int index = 0;
+  int tries = 0;
+  char wifi[40];
+  char password[40];
+  int str_len; 
+  
+  do {
+    str_len = wifiSSID[index].length() + 1;
+    wifiSSID[index].toCharArray(wifi, str_len);
+    str_len = wifiPassword[index].length() + 1;
+    wifiPassword[index].toCharArray(password, str_len);
+
+    WiFi.begin(wifi, password);
+    Serial.print("Connecting to Wi-Fi '");
+    Serial.print(wifi);
+    Serial.println("'");
+    drawFrameWifiConnecting(oled);
+ 
+    while(WiFi.status() != WL_CONNECTED && tries < 20) {
+      Serial.print(".");
+      delay(300);
+      ++tries;
+    }
+    if (tries >= 20) {
+        if (++index >= wifiCount) {
+          index = 0;
+        }
+        tries = 0;
+    }
+  } while  (WiFi.status() != WL_CONNECTED);
+  
   Serial.println();
   Serial.print("Connected with IP: ");
   Serial.println(WiFi.localIP());
