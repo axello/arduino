@@ -5,7 +5,7 @@
 #define RGB_LED_PIN 12
 
 // Number of RGB Led (can be a ring or whatever) 
-#define RGB_LED_COUNT 2
+#define RGB_LED_COUNT 8
 
 // Select The line of your LED Type (see NeoPixel Library)
 //#define RGB_TYPE NeoGrbwFeature
@@ -34,7 +34,7 @@ void LedRGBOFF(uint16_t led = 0) {};
 void LedRGBON (float hue, uint16_t led = 0) {};
 #endif
 
-uint8_t rgb_luminosity    = 50 ;    // Luminosity from 0 to 100%
+uint8_t rgb_luminosity    = 100 ;    // Luminosity from 0 to 100%
 
 
 #ifdef RGB_LED_PIN

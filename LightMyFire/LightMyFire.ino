@@ -10,22 +10,23 @@
 #include <WiFi.h>
 #include "secrets.h"
 
-#include "Firebase.h"
-
 //#include "icons.h"
 //#include "fonts.h"
 //#include "Drawdemo.h"
 
-#include "Colorconversions.h"
+#include "Firebase.h"
 #include "NeoPixel.h"
 
 FirebaseData firebaseData;
+
+const int debugPin = 4;
 
 /********************************
  * Function headers
  ********************************/
 void wifiSetup();
 void setNeopixel(float hue);
+bool showErrorMessage();
 
 /********************************
  * Functions
@@ -33,24 +34,40 @@ void setNeopixel(float hue);
 void setup() {
   
   Serial.begin(115200);
+  pinMode(debugPin, INPUT_PULLUP);
+
   String path = "/esp32/academy";
   wifiSetup();
   fbSetup();
+  LedRGBOFF();
 
   firebaseSetTest(path);
   firebaseGetTest(path);
 }
 
 void loop() {
+  static time_t lastTime = millis();
+  static int counter = 0;
+  
   if (Firebase.getDouble(firebaseData, "/lights/academy/hue")) {
-    float hue = firebaseData.floatData();
-     Serial.print (hue);
+     float hue = firebaseData.floatData();
      setNeopixels((float) hue);
-//      Serial.print("Returned datatype: ");
-//      Serial.println(firebaseData.dataType());
   } else {
-    Serial.println(firebaseData.errorReason());
+    if (showErrorMessage()) {
+      Serial.println(firebaseData.errorReason());
+    }
   }
+  
+  counter++;
+  if (millis() > (lastTime + 1000)) {
+    Serial.println(counter);
+    counter = 0;
+    lastTime = millis();
+  }
+}
+
+bool showErrorMessage() {
+  return (digitalRead(debugPin) == 1);
 }
 
 void wifiSetup() {
@@ -72,7 +89,5 @@ void wifiSetup() {
 void setNeopixels(float hue) {
   int rgb[3];
 
-  hsi2rgb(hue * 360.0, 1.0, 0.5, rgb);
-  Serial.printf("RGB: %u, %u, %u\n", rgb[0], rgb[1], rgb[2]);
   LedRGBON(hue);
 }
