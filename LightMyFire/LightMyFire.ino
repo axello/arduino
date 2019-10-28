@@ -10,12 +10,9 @@
 #include <WiFi.h>
 #include "secrets.h"
 
-//#include "icons.h"
-//#include "fonts.h"
-//#include "Drawdemo.h"
-
 #include "Firebase.h"
 #include "NeoPixel.h"
+#include "Drawdemo.h"
 
 FirebaseData firebaseData;
 
@@ -40,14 +37,16 @@ void setup() {
   wifiSetup();
   fbSetup();
   LedRGBOFF();
-
-  firebaseSetTest(path);
-  firebaseGetTest(path);
+  displaySetup();
+  
+//  firebaseSetTest(path);
+//  firebaseGetTest(path);
 }
 
 void loop() {
   static time_t lastTime = millis();
-  static int counter = 0;
+//  static int counter = 0;
+  static int errorCount = 0;
   
   if (Firebase.getDouble(firebaseData, "/lights/academy/hue")) {
      float hue = firebaseData.floatData();
@@ -56,14 +55,20 @@ void loop() {
     if (showErrorMessage()) {
       Serial.println(firebaseData.errorReason());
     }
+    if (++errorCount > 2) {
+      // lights must be off
+      LedRGBOFF();
+      errorCount = 0;
+    }
+    
   }
   
-  counter++;
-  if (millis() > (lastTime + 1000)) {
-    Serial.println(counter);
-    counter = 0;
-    lastTime = millis();
-  }
+//  counter++;
+//  if (millis() > (lastTime + 1000)) {
+//    Serial.println(counter);
+//    counter = 0;
+//    lastTime = millis();
+//  }
 }
 
 bool showErrorMessage() {
@@ -71,6 +76,7 @@ bool showErrorMessage() {
 }
 
 void wifiSetup() {
+  
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED)
@@ -84,6 +90,11 @@ void wifiSetup() {
   Serial.print("Connected to gateway: ");
   Serial.println(WiFi.gatewayIP());
   Serial.println();
+
+  OLEDDisplayUiState state;
+  OLEDDisplay *oled = (OLEDDisplay *) &display;
+  Serial.println((unsigned int) &display);
+//  drawFrameWifi(&display, &state, 0, 0);
 }
 
 void setNeopixels(float hue) {
