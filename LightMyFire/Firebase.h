@@ -1,30 +1,14 @@
-/* Sketch to demo Firebase on ESP32
-
-  Axel Roest, 2019
-*/
-
-#if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_ESP32) 
-#error "This sketch runs only on ESP32 or ESP8266 target"
-#endif 
-
-#include <WiFi.h>
-#include "secrets.h"
-
-#include "Firebase.h"
-
-//#include "icons.h"
-//#include "fonts.h"
-//#include "Drawdemo.h"
-
-/*
-
-*/
-FirebaseData firebaseData;
+/* ======================================================================
+  Function: Firebase
+  ====================================================================== */
+#include <FirebaseESP32.h>
+// #include <FirebaseESP32HTTPClient.h>
+#include <FirebaseJson.h>
+#include <jsmn.h>
 
 /********************************
  * Function headers
  ********************************/
-void wifiSetup();
 void fbSetup();
 void firebaseSetTest(String path);
 void firebaseGetTest(String path);
@@ -33,43 +17,9 @@ void printJsonObjectContent(FirebaseData &data);
 /********************************
  * Functions
  ********************************/
-void setup() {
-  
-  Serial.begin(115200);
-  String path = "/esp32/academy";
-  wifiSetup();
-  fbSetup();
 
-  firebaseSetTest(path);
-  firebaseGetTest(path);
-}
 
-void loop() {
-//  if (Firebase.getFloat(firebaseData, "/esp32/academy/hue")) {
-//
-//    if (firebaseData.dataType() == "float") {
-//      Serial.println(firebaseData.floatData());
-//    }
-//  } else {
-//    Serial.println(firebaseData.errorReason());
-//  }
-}
-
-void wifiSetup() {
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(300);
-  }
-  Serial.println();
-  Serial.print("Connected with IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("Connected to gateway: ");
-  Serial.println(WiFi.gatewayIP());
-  Serial.println();
-}
+FirebaseData firebaseData;
 
 void fbSetup() {
 
