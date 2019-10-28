@@ -8,8 +8,26 @@
   Output  : -
   Comments: -
   ====================================================================== */
-  
-class Drawdemo {
+// Display Settings
+// OLED will be checked with this address and this address+1
+// so here 0x03c and 0x03d
+#define I2C_DISPLAY_ADDRESS 0x3c
+// Choose OLED Driver Type (one only)
+#define OLED_SSD1306
+// #define OLED_SH1106
+
+  #if defined (OLED_SSD1306)
+#include <SSD1306Wire.h>
+#include <OLEDDisplayUi.h>
+#elif defined (OLED_SH1106)
+#include <SH1106Wire.h>
+#include <OLEDDisplayUi.h>
+#endif
+
+bool has_display          = false;  // if I2C display detected
+
+#include "Drawdemo2.h"
+
 	// this array keeps function pointers to all frames
 	// frames are the single views that slide from right to left
 	FrameCallback frames[] = { drawFrameWifi, drawFrameI2C, drawFrameNet, drawFrameLogo};
@@ -132,6 +150,3 @@ class Drawdemo {
 	  display->drawXbm(x + (128 - ch2i_width) / 2, y, ch2i_width, ch2i_height, ch2i_bits);
 	  ui.disableIndicator();
 	}
-
-
-}

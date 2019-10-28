@@ -11,40 +11,51 @@
 #include "secrets.h"
 
 #include <FirebaseESP32.h>
-#include <FirebaseESP32HTTPClient.h>
+// #include <FirebaseESP32HTTPClient.h>
 #include <FirebaseJson.h>
 #include <jsmn.h>
+
+//#include "icons.h"
+//#include "fonts.h"
+//#include "Drawdemo.h"
 
 /*
 
 */
 FirebaseData firebaseData;
 
+/********************************
+ * Function headers
+ ********************************/
 void wifiSetup();
 void fbSetup();
 void firebaseSetTest(String path);
 void firebaseGetTest(String path);
 void printJsonObjectContent(FirebaseData &data);
 
+/********************************
+ * Functions
+ ********************************/
 void setup() {
+  
+  Serial.begin(115200);
   String path = "/esp32/academy";
   wifiSetup();
   fbSetup();
-
 
   firebaseSetTest(path);
   firebaseGetTest(path);
 }
 
 void loop() {
-  if (Firebase.getFloat(firebaseData, "/esp32/academy/hue")) {
-
-    if (firebaseData.dataType() == "float") {
-      Serial.println(firebaseData.floatData());
-    }
-  } else {
-    Serial.println(firebaseData.errorReason());
-  }
+//  if (Firebase.getFloat(firebaseData, "/esp32/academy/hue")) {
+//
+//    if (firebaseData.dataType() == "float") {
+//      Serial.println(firebaseData.floatData());
+//    }
+//  } else {
+//    Serial.println(firebaseData.errorReason());
+//  }
 }
 
 void wifiSetup() {
@@ -58,6 +69,8 @@ void wifiSetup() {
   Serial.println();
   Serial.print("Connected with IP: ");
   Serial.println(WiFi.localIP());
+  Serial.print("Connected to gateway: ");
+  Serial.println(WiFi.gatewayIP());
   Serial.println();
 }
 
