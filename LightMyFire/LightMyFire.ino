@@ -34,10 +34,10 @@ void setup() {
   pinMode(debugPin, INPUT_PULLUP);
 
   String path = "/esp32/academy";
+  displaySetup();
   wifiSetup();
   fbSetup();
   LedRGBOFF();
-  displaySetup();
   
 //  firebaseSetTest(path);
 //  firebaseGetTest(path);
@@ -60,7 +60,11 @@ void loop() {
       LedRGBOFF();
       errorCount = 0;
     }
-    
+//     OLEDDisplayUiState state;
+//  OLEDDisplay *oled = (OLEDDisplay *) &display;
+//
+//      drawFrameNet(oled, &state, 0, 0);
+
   }
   
 //  counter++;
@@ -76,9 +80,13 @@ bool showErrorMessage() {
 }
 
 void wifiSetup() {
-  
+   OLEDDisplayUiState state;
+  OLEDDisplay *oled = (OLEDDisplay *) &display;
+ 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to Wi-Fi");
+  drawFrameWifiConnecting(oled);
+
   while (WiFi.status() != WL_CONNECTED)
   {
     Serial.print(".");
@@ -91,10 +99,23 @@ void wifiSetup() {
   Serial.println(WiFi.gatewayIP());
   Serial.println();
 
-  OLEDDisplayUiState state;
-  OLEDDisplay *oled = (OLEDDisplay *) &display;
-  Serial.println((unsigned int) &display);
-//  drawFrameWifi(&display, &state, 0, 0);
+
+//  Serial.print(F("Wifi display found at: "));
+//  unsigned long *adres = (unsigned long *) &display;
+//
+//  Serial.printf("%p\n",display);
+  drawFrameWifi(oled, &state, 0, 0);
+
+//Er is gewoon iets heel raars aan de hand met display!
+//    display.clear();
+//    display.setTextAlignment(TEXT_ALIGN_CENTER);
+//    display.setFont(Roboto_Condensed_Bold_Bold_16);
+//    // see http://blog.squix.org/2015/05/esp8266-nodemcu-how-to-create-xbm.html
+//    // on how to create xbm files
+//    display.drawXbm(  (128 - WiFi_width) / 2, 0, WiFi_width, WiFi_height, WiFi_bits);
+//    display.drawString( 64, WiFi_height + 4, WiFi.localIP().toString());
+//    ui.disableIndicator();
+
 }
 
 void setNeopixels(float hue) {

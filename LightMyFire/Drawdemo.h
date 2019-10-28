@@ -37,7 +37,7 @@
 #endif
 
 
-  #if defined (OLED_SSD1306)
+#if defined (OLED_SSD1306)
 #include <SSD1306Wire.h>
 #include <OLEDDisplayUi.h>
 #elif defined (OLED_SH1106)
@@ -72,6 +72,9 @@ char i2c_dev[I2C_DISPLAY_DEVICE][32]; // Array on string displayed
  ********************************/
   void displaySetup();
   void drawFrameWifi(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
+  void drawFrameWifiStatus(OLEDDisplay *display, String text, int16_t x, int16_t y);
+  void drawFrameWifiConnecting(OLEDDisplay *display);
+
   uint8_t i2c_scan(uint8_t address = 0xff);
   
 /********************************
@@ -92,8 +95,11 @@ void displaySetup() {
     }
   
     if (has_display) {
-      Serial.println(F("Display found"));
-      // initialize dispaly
+      Serial.print(F("Display found at: "));
+      unsigned long *adres = (unsigned long *) &display;
+        Serial.printf("%p\n",adres);
+
+      // initialize display
       display.init();
       display.flipScreenVertically();
       display.clear();
@@ -105,9 +111,8 @@ void displaySetup() {
       display.setContrast(255);
       delay(500);
     }
-  
-  
   }
+  
 	void drawProgress(OLEDDisplay *display, int percentage, String labeltop, String labelbot) {
 	  if (has_display) {
 		display->clear();
@@ -141,15 +146,25 @@ void displaySetup() {
 	  Comments: -
 	  ====================================================================== */
 	void drawFrameWifi(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-	  display->clear();
-	  display->setTextAlignment(TEXT_ALIGN_CENTER);
-	  display->setFont(Roboto_Condensed_Bold_Bold_16);
-	  // see http://blog.squix.org/2015/05/esp8266-nodemcu-how-to-create-xbm.html
-	  // on how to create xbm files
-	  display->drawXbm( x + (128 - WiFi_width) / 2, 0, WiFi_width, WiFi_height, WiFi_bits);
-	  display->drawString(x + 64, WiFi_height + 4, WiFi.localIP().toString());
-	  ui.disableIndicator();
+    drawFrameWifiStatus(display, WiFi.localIP().toString(), x, y);
 	}
+
+  void drawFrameWifiConnecting(OLEDDisplay *display) {
+    drawFrameWifiStatus(display, "Connecting to Wi-Fi", 0, 0);
+  }
+  
+  void drawFrameWifiStatus(OLEDDisplay *display, String text, int16_t x, int16_t y) {
+    display->clear();
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->setFont(Roboto_Condensed_Bold_Bold_16);
+    // see http://blog.squix.org/2015/05/esp8266-nodemcu-how-to-create-xbm.html
+    // on how to create xbm files
+    display->drawXbm( x + (128 - WiFi_width) / 2, 0, WiFi_width, WiFi_height, WiFi_bits);
+    display->drawString(x + 64, WiFi_height + 4, text);
+    display->display();
+    ui.disableIndicator();
+  }
+
 
 	/* ======================================================================
 	  Function: drawFrameI2C
@@ -209,7 +224,7 @@ void displaySetup() {
 		  display->drawString(x + 0, y + 16 + 12 * i, buff);
 		}
 	  }
-
+    display->display();
 	  ui.disableIndicator();
 	}
 
