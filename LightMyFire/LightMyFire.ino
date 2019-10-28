@@ -87,6 +87,8 @@ void wifiSetup() {
   char password[40];
   int str_len; 
   
+  drawFrameWifiConnecting(oled, "");
+  
   do {
     str_len = wifiSSID[index].length() + 1;
     wifiSSID[index].toCharArray(wifi, str_len);
@@ -97,7 +99,7 @@ void wifiSetup() {
     Serial.print("Connecting to Wi-Fi '");
     Serial.print(wifi);
     Serial.println("'");
-    drawFrameWifiConnecting(oled);
+    drawFrameWifiConnecting(oled, wifiSSID[index]);
  
     while(WiFi.status() != WL_CONNECTED && tries < 20) {
       Serial.print(".");
@@ -124,7 +126,7 @@ void wifiSetup() {
 //  unsigned long *adres = (unsigned long *) &display;
 //
 //  Serial.printf("%p\n",display);
-  drawFrameWifi(oled, &state, 0, 0);
+  drawFrameWifi(oled, &state, wifiSSID[index], 0, 0);
 
 //Er is gewoon iets heel raars aan de hand met display!
 //    display.clear();

@@ -71,9 +71,10 @@ char i2c_dev[I2C_DISPLAY_DEVICE][32]; // Array on string displayed
  * Function headers
  ********************************/
   void displaySetup();
-  void drawFrameWifi(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
-  void drawFrameWifiStatus(OLEDDisplay *display, String text, int16_t x, int16_t y);
-  void drawFrameWifiConnecting(OLEDDisplay *display);
+  void drawFrameWifi(OLEDDisplay *display, String text);
+  void drawFrameWifi(OLEDDisplay *display, OLEDDisplayUiState* state, String text, int16_t x, int16_t y);
+    void drawFrameWifiStatus(OLEDDisplay *display, String text, String text2, int16_t x, int16_t y);
+ void drawFrameWifiConnecting(OLEDDisplay *display);
 
   uint8_t i2c_scan(uint8_t address = 0xff);
   
@@ -145,15 +146,19 @@ void displaySetup() {
 	  Output  : -
 	  Comments: -
 	  ====================================================================== */
-	void drawFrameWifi(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-    drawFrameWifiStatus(display, WiFi.localIP().toString(), x, y);
+  void drawFrameWifi(OLEDDisplay *display, String text) {
+    drawFrameWifiStatus(display, text, "", 0, 0);
+  }
+
+	void drawFrameWifi(OLEDDisplay *display, OLEDDisplayUiState* state, String text, int16_t x, int16_t y) {
+    drawFrameWifiStatus(display, WiFi.localIP().toString(), text, x, y);
 	}
 
-  void drawFrameWifiConnecting(OLEDDisplay *display) {
-    drawFrameWifiStatus(display, "Connecting to Wi-Fi", 0, 0);
+  void drawFrameWifiConnecting(OLEDDisplay *display, String text) {
+    drawFrameWifiStatus(display, "Connecting to Wi-Fi", text, 0, 0);
   }
   
-  void drawFrameWifiStatus(OLEDDisplay *display, String text, int16_t x, int16_t y) {
+  void drawFrameWifiStatus(OLEDDisplay *display, String text, String text2, int16_t x, int16_t y) {
     display->clear();
     display->setTextAlignment(TEXT_ALIGN_CENTER);
     display->setFont(Roboto_Medium_Plain_12);
@@ -161,6 +166,7 @@ void displaySetup() {
     // on how to create xbm files
     display->drawXbm( x + (128 - WiFi_width) / 2, 0, WiFi_width, WiFi_height, WiFi_bits);
     display->drawString(x + 64, WiFi_height + 4, text);
+    display->drawString(x + 64, WiFi_height + 20, text2);
     display->display();
     ui.disableIndicator();
   }
