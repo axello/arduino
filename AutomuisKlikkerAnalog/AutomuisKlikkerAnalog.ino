@@ -20,6 +20,10 @@
  This example code is in the public domain.
  
  http://www.arduino.cc/en/Tutorial/BlinkWithoutDelay
+
+ Axel Roest
+ This version uses an analog value, derived from a potmeter, to set the click speed
+ 
  */
 
 typedef enum buttonStateType {
@@ -30,7 +34,7 @@ typedef enum buttonStateType {
 
 // constants
 #define BUTTONCOUNT 2
-// #define DEBUG
+#define DEBUG 1
 
 
 const int upPin =  3;      // the number of the LED pin
@@ -38,6 +42,7 @@ const int downPin =  4;      // the number of the LED pin
 const int upLedPin = 8;
 const int downLedPin = 9;
 const int ledPin =  13;      // the number of the LED pin
+const int analogPin = 0;
 
 // Variables will change :
 int ledState = LOW;             // ledState used to set the LED
@@ -73,7 +78,8 @@ void loop()
   static unsigned long lastCheck = 0;
 
   if (currentMillis - lastCheck > buttonCheckInterval) {
-    handleButtons();
+//    handleButtons();
+    handleAnalog();
     lastCheck = currentMillis;  
   }
 
@@ -93,6 +99,17 @@ void loop()
   }
   // set the LED with the ledState of the variable:
   digitalWrite(ledPin, ledState);
+}
+
+void handleAnalog() {
+  //(-160*1024 + 512*360) / 512
+  // doing some fixed num calculation
+  const long a = -160;
+  const long c = 360 * 512;
+  const long factor = 512;
+  
+  int analogValue = analogRead(analogPin);  // 0 - 1023
+  interval = (a * analogValue + c) / factor;
 }
 
 void handleButtons() {
