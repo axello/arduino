@@ -14,12 +14,12 @@
  */
 
 #include <ESP8266WiFi.h>
-#include <BlynkSimpleEsp8266.h>
+// #include <BlynkSimpleEsp8266.h>
 #include "secrets.h"
 
 // constants
 
-// #define DEBUG 0
+#define DEBUG 0
 #ifdef DEBUG
 #define BLYNK_PRINT Serial
 #endif
@@ -35,7 +35,7 @@ const int onlineLED = D0;       // show/hide connection with Blynk, on-board LED
 int ledState = LOW;             // ledState used to set the LED
 long interval = 200;            // interval at which to blink (milliseconds)
 boolean clickEnabled = true;            // remote enabler/disabler
-boolean blynkEnabled = true;            // Blynk enabler/disabler
+boolean blynkEnabled = false;            // Blynk enabler/disabler
 
 // Generally, you should use "unsigned long" for variables that hold time
 // The value will quickly become too large for an int to store
@@ -43,13 +43,23 @@ const unsigned long int clickDuration = 40;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
-char auth[] = BLYNK_TOKEN;
+char auth[] = BLYNK_AUTH_TOKEN;
 
 // Your WiFi credentials.
 // Set password to "" for open networks.
 char ssid[] = WIFI_SSID;
 char pass[] = WIFI_PASSWORD;
 
+// This function is called every time the device is connected to the Blynk.Cloud
+// BLYNK_CONNECTED()
+// {
+//   // Change Web Link Button message to "Congratulations!"
+//   Blynk.setProperty(V3, "offImageUrl", "https://static-image.nyc3.cdn.digitaloceanspaces.com/general/fte/congratulations.png");
+//   Blynk.setProperty(V3, "onImageUrl",  "https://static-image.nyc3.cdn.digitaloceanspaces.com/general/fte/congratulations_pressed.png");
+//   Blynk.setProperty(V3, "url", "https://docs.blynk.io/en/getting-started/what-do-i-need-to-blynk/how-quickstart-device-was-made");
+//   Serial.println(" | Blynk Connected");  
+
+// }
 
 void setup() 
 {
@@ -63,7 +73,7 @@ void setup()
    Serial.println("Auto MuisKlikker Analog");
 #endif
 
-  Blynk.begin(auth, ssid, pass);
+// # Blynk.begin(auth, ssid, pass);
 }
 
 void loop()
@@ -78,11 +88,12 @@ void loop()
 
   // check Blynk button every second
   if (currentMillis - lastBlynkButtonCheck > 1000) {
-    blynkEnabled = boolean(digitalRead(onlineSwitch));
+    // blynkEnabled = boolean(digitalRead(onlineSwitch));
+    // blynkEnabled = false;
     digitalWrite(onlineLED, blynkEnabled);
   }
   if (blynkEnabled) {
-    Blynk.run();
+    // Blynk.run();
   }
 }
 
@@ -165,21 +176,26 @@ void doPulses(unsigned long currentMillis)
 
 // Update virtual pins
 void updateInterval(long interval) {
-  Blynk.virtualWrite(V1, interval);
+  // Blynk.virtualWrite(V1, interval);
 }
 
 /// BLYNK STUFF
-BLYNK_WRITE(V0)
-{
-  clickEnabled = boolean(param.asInt());
-}
+// BLYNK_WRITE(V0)
+// {
+//   clickEnabled = boolean(param.asInt());
+// }
 
-BLYNK_READ(V0)
-{
-  Blynk.virtualWrite(V0, int(clickEnabled));
-}
+// BLYNK_READ(V0)
+// {
+//   Blynk.virtualWrite(V1, int(clickEnabled));
+// }
 
-BLYNK_READ(V1)
-{
-  updateInterval(interval);
-}
+// BLYNK_READ(V1)
+// {
+//   updateInterval(interval);
+// }
+
+// BLYNK_CONNECTED()
+// {
+//   Serial.println(" | Blynk Connected");  
+// }
