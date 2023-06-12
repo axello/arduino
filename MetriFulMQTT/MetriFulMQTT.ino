@@ -98,7 +98,8 @@ LightData_t lightData = {0};
 ParticleData_t particleData = {0};
 SoundData_t soundData = {0};
 float temperature1 = DEVICE_DISCONNECTED_C;
-// float temperature2 = DEVICE_DISCONNECTED_C;
+float temperature2 = DEVICE_DISCONNECTED_C;
+float temperature3 = DEVICE_DISCONNECTED_C;
 
 // MQTT
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
@@ -112,28 +113,48 @@ OneWire oneWire(ONE_WIRE_BUS_1);
 DallasTemperature temp_sensors(&oneWire);
 
 // arrays to hold device addresses
-DeviceAddress thermometer1, thermometer2;
+#define MAXTHERMOMETERS 5
+// DeviceAddress thermometers[MAXTHERMOMETERS];
+DeviceAddress thermometer1, thermometer2, thermometer3;
+
 #endif
 
 void searchOneWireDevices() {
+  // for (int i=0 ; i < MAXTHERMOMETERS ; i++) {
+  //   thermometers[i] = 0;
+  // }
   temp_sensors.begin();
 
     // locate devices on the bus
   Serial.print("\nLocating devices...");
   Serial.print("Found ");
-  Serial.print(temp_sensors.getDeviceCount(), DEC);
+  int deviceCount = temp_sensors.getDeviceCount();
+  Serial.print(deviceCount, DEC);
   Serial.println(" devices.");
-  
+  // if deviceCount > MAXTHERMOMETERS {
+  //   Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");
+  // }
+
   // report parasite power requirements
   Serial.print("Parasite OneWire power is: ");
-  if (temp_sensors.isParasitePowerMode()) Serial.println("ON");
-  else Serial.println("OFF");
+  if (temp_sensors.isParasitePowerMode()) {
+    Serial.println("ON");
+  } else {
+    Serial.println("OFF");
+  }
 
   // search
   oneWire.reset_search();
+  // int index = 0;
+  // DeviceAddress tempThermo
+  // while index < MAXTHERMOMETERS && oneWire.search(tempThermo) {
+  //   thermometers[index++] = tempThermo;
+  // }
+
   if (!oneWire.search(thermometer1)) Serial.println("Unable to find address for thermometer1");
   // assigns the second address found to thermometer2
   if (!oneWire.search(thermometer2)) Serial.println("Unable to find address for thermometer2");
+  if (!oneWire.search(thermometer3)) Serial.println("Unable to find address for thermometer3");
 
   // report
   // show the addresses we found on the bus
@@ -143,6 +164,10 @@ void searchOneWireDevices() {
 
   Serial.print("Device 1 Address: ");
   printAddress(thermometer2);
+  Serial.println();
+
+  Serial.print("Device 2 Address: ");
+  printAddress(thermometer3);
   Serial.println();
 }
 
@@ -167,8 +192,8 @@ void setup() {
 
   // Initialize the host's pins, set up the serial port and reset:
   SensorHardwareSetup(I2C_ADDRESS);
-  // Serial.print("interupt on: GPIO");
-  // Serial.println(S_INT_PIN);
+  Serial.print("interupt on: GPIO");
+  Serial.println(S_INT_PIN);
 
 #ifdef DALLAS
   pinMode(DS_ENABLE_PIN, OUTPUT);
@@ -254,10 +279,10 @@ void loop() {
   if(tempC != DEVICE_DISCONNECTED_C) {
     temperature1 = tempC;
   }
-  // tempC = temp_sensors.getTempC(thermometer2);
-  // if(tempC != DEVICE_DISCONNECTED_C) {
-  //   temperature2 = tempC;
-  // }
+  tempC = temp_sensors.getTempC(thermometer2);
+  if(tempC != DEVICE_DISCONNECTED_C) {
+    temperature2 = tempC;
+  }
 
 #endif
 
@@ -318,10 +343,14 @@ void post_MQTT(void) {
     sprintf(fieldBuffer, "\"temp1\":%5.2f,\n", temperature1);
     strcat(postBuffer, fieldBuffer);
   }
-  // if(temperature2 != DEVICE_DISCONNECTED_C) {
-  //   sprintf(fieldBuffer, "\"temp2\":%5.2f,\n", temperature2);
-  //   strcat(postBuffer, fieldBuffer);
-  // }
+  if(temperature2 != DEVICE_DISCONNECTED_C) {
+    sprintf(fieldBuffer, "\"temp2\":%5.2f,\n", temperature2);
+    strcat(postBuffer, fieldBuffer);
+  }
+  if(temperature3 != DEVICE_DISCONNECTED_C) {
+    sprintf(fieldBuffer, "\"temp3\":%5.2f,\n", temperature3);
+    strcat(postBuffer, fieldBuffer);
+  }
 
 #endif
     // https://stackoverflow.com/questions/45922817/what-is-unquoted-priu32-in-printf-in-c
