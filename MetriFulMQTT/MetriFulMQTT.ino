@@ -163,18 +163,18 @@ void printAddress(DeviceAddress deviceAddress)
 * 
 *******************************************************************/
 void setup() {
-  Serial.begin(SERIAL_BAUD_RATE);
+  // Serial.begin(SERIAL_BAUD_RATE);
 
   // Initialize the host's pins, set up the serial port and reset:
-  // SensorHardwareSetup(I2C_ADDRESS);
+  SensorHardwareSetup(I2C_ADDRESS);
   // Serial.print("interupt on: GPIO");
   // Serial.println(S_INT_PIN);
 
 #ifdef DALLAS
   pinMode(DS_ENABLE_PIN, OUTPUT);
   digitalWrite(DS_ENABLE_PIN, HIGH);
-  delay(10);
-    ();
+  searchOneWireDevices();
+  delay(100);
 #endif
     
   connectToWiFi(SSID, password);
@@ -278,8 +278,8 @@ void loop() {
 //   else {
 //     http_POST_data_Thingspeak_cloud();
 //   }
-  // post_MQTT();
-  toggle_LED();
+  post_MQTT();
+  // toggle_LED();
 }
 
 void toggle_LED(void) {
