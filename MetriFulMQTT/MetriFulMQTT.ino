@@ -436,10 +436,10 @@ void post_MQTT(void) {
     size_t len = MAXBUFFERSIZE - (strlen(postBuffer) + 15);
     sprintf(fieldBuffer,"\"rest_buf\":%u\n", len);
     strcat(postBuffer, fieldBuffer);
-    strcat(postBuffer, "\n}");
+    strcat(postBuffer, "}");
 
     len = strlen(postBuffer);
-    Serial.println(len);
+    // Serial.println(len);
     postBuffer[len] = '\0';
     // Serial.print(" : ");
     // Serial.print(postBuffer);
