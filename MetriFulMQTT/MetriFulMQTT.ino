@@ -43,7 +43,7 @@ void MQTT_connect();
 
 //////////////////////////////////////////////////////////
 // USER-EDITABLE SETTINGS
-#define SERIAL_BAUD_RATE 57600
+#define SERIAL_BAUD_RATE 9600
 
 // How often to read and log data (every 100 or 300 seconds)
 // Note: due to data rate limits on free cloud services, this should 
@@ -188,10 +188,10 @@ void printAddress(DeviceAddress deviceAddress)
 * 
 *******************************************************************/
 void setup() {
-  // Serial.begin(SERIAL_BAUD_RATE);
+  Serial.begin(SERIAL_BAUD_RATE);
 
   // Initialize the host's pins, set up the serial port and reset:
-  SensorHardwareSetup(I2C_ADDRESS);
+
   Serial.print("interupt on: GPIO");
   Serial.println(S_INT_PIN);
 
@@ -201,6 +201,8 @@ void setup() {
   searchOneWireDevices();
   delay(100);
 #endif
+
+  SensorHardwareSetup(I2C_ADDRESS);
     
   connectToWiFi(SSID, password);
   
