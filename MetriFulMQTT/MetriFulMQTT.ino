@@ -61,7 +61,8 @@ char password[] = WIFI_PASSWORD; // network password
 
 // The details of the MQTT PUBLISHER:
 #define NODENAME oranjeslaap
-#define MQTT_FEED "metriful/oranjeslaap/state"
+#define MQTT_FEED "metriful/oranjeslaap/tele"
+#define MQTT_STATE "metriful/oranjeslaap/state"
 
 // Define DALLAS for 1 ds18b20, or DALLAS2 for 2 dallas
 #define DALLAS
@@ -98,7 +99,8 @@ SoundData_t soundData = {0};
 // MQTT
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
 Adafruit_MQTT_Client mqtt(&client, MQTT_SERVER, MQTT_SERVERPORT);
-Adafruit_MQTT_Publish metriful = Adafruit_MQTT_Publish(&mqtt, MQTT_FEED);
+Adafruit_MQTT_Publish feedPublisher = Adafruit_MQTT_Publish(&mqtt, MQTT_FEED);
+Adafruit_MQTT_Publish statePublisher = Adafruit_MQTT_Publish(&mqtt, MQTT_STATE);
 
 // DALLAS DS18B20
 #ifdef DALLAS
@@ -115,6 +117,36 @@ float temperatures[MAXTHERMOMETERS];
 
 int dallasDeviceCount;
 #endif
+enum Status { error, ok , nodallas};
+
+void post_MQTT_state(Status state) {
+    String input;
+    switch(state) {
+      case error: 
+        input = "{\"status\": \"ERROR\"}";
+        break;
+      case ok:
+        input = "{\"status\": \"OK\"}";
+        break;
+      case nodallas:
+        input = "{\"status\": \"NO DALLAS DEVICE DETECTED\"}";
+        break;
+      default:
+        input = "{\"status\": \"Serious error\"}";
+    }
+        // json.copy(&postBuffer, POSTBUFFER_SIZE);
+    const char* postBuf = input.c_str();
+    // postBuffer[json.length()] = '\0';
+
+    size_t len = strlen(postBuf);
+    // Serial.println(len);
+    postBuffer[len] = '\0';
+
+    if (!statePublisher.publish(postBuf, len)) {
+      // Serial.println("Could not send mqtt.");
+    }
+
+}
 
 void searchOneWireDevices() {
   temp_sensors.begin();
@@ -128,6 +160,12 @@ void searchOneWireDevices() {
   if (dallasDeviceCount > MAXTHERMOMETERS) {
     Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");
     dallasDeviceCount = MAXTHERMOMETERS;
+  }
+
+  if (dallasDeviceCount == 0) {
+    post_MQTT_state(nodallas);
+  } else {
+    post_MQTT_state(ok);
   }
 
   // report parasite power requirements
@@ -205,6 +243,8 @@ void setup() {
 
   // Initialize the host's pins, set up the serial port and reset:
   SensorHardwareSetup(I2C_ADDRESS);
+  Serial.begin(SERIAL_BAUD_RATE);
+
   Serial.print("interupt on: GPIO");
   Serial.println(S_INT_PIN);
 
@@ -217,6 +257,8 @@ void setup() {
   }
   searchOneWireDevices();
   delay(100);
+#else
+  Serial.println("NO DALLAS\n");
 #endif
     
   connectToWiFi(SSID, password);
@@ -403,10 +445,9 @@ void post_MQTT(void) {
     // Serial.print(postBuffer);
     uint8_t *otherBuffer = (uint8_t*) postBuffer;
 
-    if (!metriful.publish(otherBuffer, len)) {
+    if (!feedPublisher.publish(otherBuffer, len)) {
       Serial.println("Could not send mqtt.");
     }
-
     // client.println(fieldBuffer);
     // client.println();
     // client.print(postBuffer);

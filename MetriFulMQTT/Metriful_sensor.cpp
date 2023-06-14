@@ -45,11 +45,13 @@ void SensorHardwareSetup(uint8_t i2c_7bit_address) {
   // Start the serial port.
   // Full settings are: 8 data bits, no parity, one stop bit
   Serial.begin(SERIAL_BAUD_RATE);
-  
+  Serial.println("Starting\n");
+
   // Wait for the MS430 to finish power-on initialization:
   while (digitalRead(READY_PIN) == HIGH) {
     yield();
   } 
+  Serial.println("yielded 1\n");
   
   // Reset to clear any previous state:
   TransmitI2C(i2c_7bit_address, RESET_CMD, 0, 0);
@@ -59,6 +61,7 @@ void SensorHardwareSetup(uint8_t i2c_7bit_address) {
   while (digitalRead(READY_PIN) == HIGH) {
     yield();
   } 
+  Serial.println("yielded 2\n");
 }
 
 volatile bool ready_assertion_event = false;

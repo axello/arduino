@@ -46,7 +46,7 @@
 ////////////////////////////////////////////////////////////////////////
 
 #define I2C_CLK_FREQ_HZ 100000
-#define SERIAL_BAUD_RATE 9600
+#define SERIAL_BAUD_RATE 57600
 
 // Unicode symbol strings
 #define CELSIUS_SYMBOL "\u00B0C"
