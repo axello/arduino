@@ -25,6 +25,7 @@
 /* FUTURE
   once every couple of hours, disable the DS18b20 for a while
   then enable; to reset them.
+  when buffer is too full, return an error state in an MQTT message with the buffer size
 
 */
 
@@ -40,6 +41,10 @@
 #include <DallasTemperature.h>
 
 void MQTT_connect();
+
+// override Adafruit_MQTT buffer size!
+// (Can't do that here, do it in Adafruit_MQTT.h)
+// #define MAXBUFFERSIZE (500)
 
 //////////////////////////////////////////////////////////
 // USER-EDITABLE SETTINGS
@@ -77,7 +82,7 @@ char password[] = WIFI_PASSWORD; // network password
 WiFiClient client;
 
 // Buffers for assembling MQTT requests
-char postBuffer[600] = {0};
+char postBuffer[MAXBUFFERSIZE] = {0};
 char fieldBuffer[70] = {0};
 
 unsigned long nextTicks = 0;
@@ -89,36 +94,29 @@ AirQualityData_t airQualityData = {0};
 LightData_t lightData = {0}; 
 ParticleData_t particleData = {0};
 SoundData_t soundData = {0};
-float temperature1 = DEVICE_DISCONNECTED_C;
-float temperature2 = DEVICE_DISCONNECTED_C;
-float temperature3 = DEVICE_DISCONNECTED_C;
 
 // MQTT
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
 Adafruit_MQTT_Client mqtt(&client, MQTT_SERVER, MQTT_SERVERPORT);
-
 Adafruit_MQTT_Publish metriful = Adafruit_MQTT_Publish(&mqtt, MQTT_FEED);
 
 // DALLAS DS18B20
 #ifdef DALLAS
 OneWire oneWire(ONE_WIRE_BUS_1);
 DallasTemperature temp_sensors(&oneWire);
+#define EMPTYTHERMOMETER "0:0:0:0:0:0:0:0\0"
+#define DeviceAddressStringLength 17
+#define DeviceAddressLength 8
 
 // arrays to hold device addresses
 #define MAXTHERMOMETERS 5
-DeviceAddress thermometers[MAXTHERMOMETERS];
+char thermometers[MAXTHERMOMETERS][DeviceAddressStringLength];
 float temperatures[MAXTHERMOMETERS];
-// DeviceAddress thermometer1, thermometer2, thermometer3;
-#define DeviceAddressStringLength 17
-#define DeviceAddressLength 8
 
 int dallasDeviceCount;
 #endif
 
 void searchOneWireDevices() {
-  // for (int i=0 ; i < MAXTHERMOMETERS ; i++) {
-  //   thermometers[i] = 0;
-  // }
   temp_sensors.begin();
 
     // locate devices on the bus
@@ -127,7 +125,7 @@ void searchOneWireDevices() {
   dallasDeviceCount = temp_sensors.getDeviceCount();
   Serial.print(dallasDeviceCount, DEC);
   Serial.println(" devices.");
-  if dallasDeviceCount > MAXTHERMOMETERS {
+  if (dallasDeviceCount > MAXTHERMOMETERS) {
     Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");
     dallasDeviceCount = MAXTHERMOMETERS;
   }
@@ -143,10 +141,14 @@ void searchOneWireDevices() {
   // search
   oneWire.reset_search();
   int index = 0;
-  DeviceAddress tempThermo
+  char buffer[DeviceAddressStringLength];
+  char *ptr = &buffer[0];
+
+  DeviceAddress tempThermo;
   while (index < dallasDeviceCount && oneWire.search(tempThermo)) {
-    thermometers[index++] = tempThermo;
+    addressToString(tempThermo, thermometers[index]);
     printDevice(index, tempThermo);
+    index++;
   }
 
   if (index < dallasDeviceCount) {
@@ -159,7 +161,7 @@ void printDevice(int index, DeviceAddress deviceAddress) {
     Serial.print("Device ");
     Serial.print(index);
     Serial.print(" Address: ");
-    printAddress(tempThermo);
+    printAddress(deviceAddress);
     Serial.println();
 }
 
@@ -179,7 +181,7 @@ void addressToString(DeviceAddress deviceAddress, char *stringBuf)
   char *ptr = stringBuf;
 
   for (int i = 0; i < DeviceAddressLength; i++) {
-    ptr += sprintf(ptr, "%02X", deviceAddress[i]);
+    ptr += snprintf(ptr, DeviceAddressStringLength, "%02X", deviceAddress[i]);
   }
   stringBuf[DeviceAddressStringLength-1] = '\0';
 }
@@ -187,9 +189,8 @@ void addressToString(DeviceAddress deviceAddress, char *stringBuf)
 void fetchTemperatures()
 {
   for (int index = 0; index < dallasDeviceCount; index++) {
-    float tempC = temp_sensors.getTempC(thermometers[index]);
+    temperatures[index] = temp_sensors.getTempCByIndex(index);
     // DEVICE_DISCONNECTED_C (-127) is a perfectly valid and visible indication of something amiss.
-    temperatures[index] = tempC;
     // if(tempC != DEVICE_DISCONNECTED_C) {
     // }
   }
@@ -212,7 +213,7 @@ void setup() {
   digitalWrite(DS_ENABLE_PIN, HIGH);
   for (int index = 0; index < MAXTHERMOMETERS; index++) {
     temperatures[index] = DEVICE_DISCONNECTED_C;
-    thermometers[index] = 0;
+    strncpy(thermometers[index], EMPTYTHERMOMETER, 17);
   }
   searchOneWireDevices();
   delay(100);
@@ -341,11 +342,10 @@ void post_MQTT(void) {
   // preamble
   strcat(postBuffer, "\"dallas\":{\n");
 
-  char output[DeviceAddressStringLength];
   for (int index = 0; index < dallasDeviceCount; index++) {
     float temp = temperatures[index];
     if(temp != DEVICE_DISCONNECTED_C) {
-      sprintf(fieldBuffer, "\"%s\":%5.2f,\n", addressToString(thermometers[index], &output), temp);
+      sprintf(fieldBuffer, "\"%s\":%5.2f,\n", thermometers[index], temp);
       strcat(postBuffer, fieldBuffer);
     }
   }
@@ -386,13 +386,17 @@ void post_MQTT(void) {
             particleData.concentration_int, particleData.concentration_fr_2dp);
     strcat(postBuffer, fieldBuffer);
     
-    sprintf(fieldBuffer,"\"illuminance\":%u.%02u", 
+    sprintf(fieldBuffer,"\"illuminance\":%u.%02u,\n", 
             lightData.illum_lux_int, lightData.illum_lux_fr_2dp);
     strcat(postBuffer, fieldBuffer);
 
+    // show rest of buffer length minus offset
+    size_t len = MAXBUFFERSIZE - (strlen(postBuffer) + 15);
+    sprintf(fieldBuffer,"\"rest_buf\":%u\n", len);
+    strcat(postBuffer, fieldBuffer);
     strcat(postBuffer, "\n}");
 
-    size_t len = strlen(postBuffer);
+    len = strlen(postBuffer);
     Serial.println(len);
     postBuffer[len] = '\0';
     // Serial.print(" : ");
@@ -407,58 +411,6 @@ void post_MQTT(void) {
     // client.println();
     // client.print(postBuffer);
 }
-
-
-// // Assemble the data into the required format, then send it to the
-// // Thingspeak.com cloud as an HTTP POST request.
-// void http_POST_data_Thingspeak_cloud(void) {
-//   client.stop();
-//   if (client.connect("api.thingspeak.com", 80)) { 
-//     client.println("POST /update HTTP/1.1");
-//     client.println("Host: api.thingspeak.com");
-//     client.println("Content-Type: application/x-www-form-urlencoded");
-    
-//     strcpy(postBuffer,"api_key=" THINGSPEAK_API_KEY_STRING);
-    
-//     uint8_t T_intPart = 0;
-//     uint8_t T_fractionalPart = 0;
-//     bool isPositive = true;
-//     getTemperature(&airData, &T_intPart, &T_fractionalPart, &isPositive);
-//     sprintf(fieldBuffer,"&field1=%s%u.%u", isPositive?"":"-", T_intPart, T_fractionalPart);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field2=%" PRIu32, airData.P_Pa);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field3=%u.%u", airData.H_pc_int, airData.H_pc_fr_1dp);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field4=%u.%u", airQualityData.AQI_int, airQualityData.AQI_fr_1dp);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field5=%u.%02u", airQualityData.bVOC_int, airQualityData.bVOC_fr_2dp);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field6=%u.%u", soundData.SPL_dBA_int, soundData.SPL_dBA_fr_1dp);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field7=%u.%02u", lightData.illum_lux_int, lightData.illum_lux_fr_2dp);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     sprintf(fieldBuffer,"&field8=%u.%02u", particleData.concentration_int, 
-//                                            particleData.concentration_fr_2dp);
-//     strcat(postBuffer, fieldBuffer);
-    
-//     size_t len = strlen(postBuffer);
-//     sprintf(fieldBuffer,"Content-Length: %u",len);  
-//     client.println(fieldBuffer); 
-//     client.println(); 
-//     client.print(postBuffer);
-//   }
-//   else {
-//     Serial.println("Client connection failed.");
-//   }
-// }
 
 // Function to connect and reconnect as necessary to the MQTT server.
 // Should be called in the loop function and it will take care if connecting.
