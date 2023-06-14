@@ -242,7 +242,6 @@ void setup() {
   // Serial.begin(SERIAL_BAUD_RATE);
 
   // Initialize the host's pins, set up the serial port and reset:
-  SensorHardwareSetup(I2C_ADDRESS);
   Serial.begin(SERIAL_BAUD_RATE);
 
   Serial.print("interupt on: GPIO");
@@ -268,6 +267,7 @@ void setup() {
   TransmitI2C(I2C_ADDRESS, PARTICLE_SENSOR_SELECT_REG, &particleSensor, 1);
   TransmitI2C(I2C_ADDRESS, CYCLE_TIME_PERIOD_REG, &cycle_period, 1);
 
+  SensorHardwareSetup(I2C_ADDRESS);
   // Enter cycle mode
   ready_assertion_event = false;
   TransmitI2C(I2C_ADDRESS, CYCLE_MODE_CMD, 0, 0);
