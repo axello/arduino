@@ -58,14 +58,6 @@ char password[] = WIFI_PASSWORD; // network password
 #define NODENAME oranjeslaap
 #define MQTT_FEED "metriful/oranjeslaap/state"
 
-// IoT cloud settings
-// This example uses the free IoT cloud hosting services provided 
-// by Tago.io or Thingspeak.com
-// Other free cloud providers are available.
-// An account must have been set up with the relevant cloud provider 
-// and a WiFi internet connection must exist. See the accompanying 
-// readme and User Guide for more information.
-
 // Define DALLAS for 1 ds18b20, or DALLAS2 for 2 dallas
 #define DALLAS
 
@@ -84,8 +76,8 @@ char password[] = WIFI_PASSWORD; // network password
 
 WiFiClient client;
 
-// Buffers for assembling http POST requests
-char postBuffer[400] = {0};
+// Buffers for assembling MQTT requests
+char postBuffer[600] = {0};
 char fieldBuffer[70] = {0};
 
 unsigned long nextTicks = 0;
@@ -114,9 +106,13 @@ DallasTemperature temp_sensors(&oneWire);
 
 // arrays to hold device addresses
 #define MAXTHERMOMETERS 5
-// DeviceAddress thermometers[MAXTHERMOMETERS];
-DeviceAddress thermometer1, thermometer2, thermometer3;
+DeviceAddress thermometers[MAXTHERMOMETERS];
+float temperatures[MAXTHERMOMETERS];
+// DeviceAddress thermometer1, thermometer2, thermometer3;
+#define DeviceAddressStringLength 17
+#define DeviceAddressLength 8
 
+int dallasDeviceCount;
 #endif
 
 void searchOneWireDevices() {
@@ -128,12 +124,13 @@ void searchOneWireDevices() {
     // locate devices on the bus
   Serial.print("\nLocating devices...");
   Serial.print("Found ");
-  int deviceCount = temp_sensors.getDeviceCount();
-  Serial.print(deviceCount, DEC);
+  dallasDeviceCount = temp_sensors.getDeviceCount();
+  Serial.print(dallasDeviceCount, DEC);
   Serial.println(" devices.");
-  // if deviceCount > MAXTHERMOMETERS {
-  //   Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");
-  // }
+  if dallasDeviceCount > MAXTHERMOMETERS {
+    Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");
+    dallasDeviceCount = MAXTHERMOMETERS;
+  }
 
   // report parasite power requirements
   Serial.print("Parasite OneWire power is: ");
@@ -145,36 +142,31 @@ void searchOneWireDevices() {
 
   // search
   oneWire.reset_search();
-  // int index = 0;
-  // DeviceAddress tempThermo
-  // while index < MAXTHERMOMETERS && oneWire.search(tempThermo) {
-  //   thermometers[index++] = tempThermo;
-  // }
+  int index = 0;
+  DeviceAddress tempThermo
+  while (index < dallasDeviceCount && oneWire.search(tempThermo)) {
+    thermometers[index++] = tempThermo;
+    printDevice(index, tempThermo);
+  }
 
-  if (!oneWire.search(thermometer1)) Serial.println("Unable to find address for thermometer1");
-  // assigns the second address found to thermometer2
-  if (!oneWire.search(thermometer2)) Serial.println("Unable to find address for thermometer2");
-  if (!oneWire.search(thermometer3)) Serial.println("Unable to find address for thermometer3");
+  if (index < dallasDeviceCount) {
+    Serial.println("Did not store all detected Onewire devices.");
+  }
+}
 
-  // report
-  // show the addresses we found on the bus
-  Serial.print("Device 0 Address: ");
-  printAddress(thermometer1);
-  Serial.println();
-
-  Serial.print("Device 1 Address: ");
-  printAddress(thermometer2);
-  Serial.println();
-
-  Serial.print("Device 2 Address: ");
-  printAddress(thermometer3);
-  Serial.println();
+// show the addresses we found on the bus
+void printDevice(int index, DeviceAddress deviceAddress) {
+    Serial.print("Device ");
+    Serial.print(index);
+    Serial.print(" Address: ");
+    printAddress(tempThermo);
+    Serial.println();
 }
 
 // function to print a device address
 void printAddress(DeviceAddress deviceAddress)
 {
-  for (uint8_t i = 0; i < 8; i++)
+  for (uint8_t i = 0; i < DeviceAddressLength; i++)
   {
     // zero pad the address if necessary
     if (deviceAddress[i] < 16) Serial.print("0");
@@ -182,6 +174,26 @@ void printAddress(DeviceAddress deviceAddress)
   }
 }
 
+void addressToString(DeviceAddress deviceAddress, char *stringBuf)
+{
+  char *ptr = stringBuf;
+
+  for (int i = 0; i < DeviceAddressLength; i++) {
+    ptr += sprintf(ptr, "%02X", deviceAddress[i]);
+  }
+  stringBuf[DeviceAddressStringLength-1] = '\0';
+}
+
+void fetchTemperatures()
+{
+  for (int index = 0; index < dallasDeviceCount; index++) {
+    float tempC = temp_sensors.getTempC(thermometers[index]);
+    // DEVICE_DISCONNECTED_C (-127) is a perfectly valid and visible indication of something amiss.
+    temperatures[index] = tempC;
+    // if(tempC != DEVICE_DISCONNECTED_C) {
+    // }
+  }
+}
 /*******************************************************************
 *
 *     SETUP
@@ -198,6 +210,10 @@ void setup() {
 #ifdef DALLAS
   pinMode(DS_ENABLE_PIN, OUTPUT);
   digitalWrite(DS_ENABLE_PIN, HIGH);
+  for (int index = 0; index < MAXTHERMOMETERS; index++) {
+    temperatures[index] = DEVICE_DISCONNECTED_C;
+    thermometers[index] = 0;
+  }
   searchOneWireDevices();
   delay(100);
 #endif
@@ -273,17 +289,8 @@ void loop() {
     ReceiveI2C(I2C_ADDRESS, PARTICLE_DATA_READ, (uint8_t *) &particleData, PARTICLE_DATA_BYTES);
   }
 
-
 #ifdef DALLAS
-  float tempC = temp_sensors.getTempC(thermometer1);
-  if(tempC != DEVICE_DISCONNECTED_C) {
-    temperature1 = tempC;
-  }
-  tempC = temp_sensors.getTempC(thermometer2);
-  if(tempC != DEVICE_DISCONNECTED_C) {
-    temperature2 = tempC;
-  }
-
+  fetchTemperatures();
 #endif
 
   // Check that WiFi is still connected
@@ -296,13 +303,6 @@ void loop() {
     ready_assertion_event = false;
   }
 
-  // Send data to the cloud
-//   if (useTagoCloud) {
-//     http_POST_data_Tago_cloud();
-//   }
-//   else {
-//     http_POST_data_Thingspeak_cloud();
-//   }
   post_MQTT();
   // toggle_LED();
 }
@@ -330,28 +330,28 @@ void toggle_LED(void) {
 
 // Assemble the data into the required format, then send it to the MQTT Publisher
 void post_MQTT(void) {
-        
-    uint8_t T_intPart = 0;
-    uint8_t T_fractionalPart = 0;
-    bool isPositive = true;
-    getTemperature(&airData, &T_intPart, &T_fractionalPart, &isPositive);
-    
-    sprintf(postBuffer,"{\"temperature\":%u.%u,\n", T_intPart, T_fractionalPart);
+
+  uint8_t T_intPart = 0;
+  uint8_t T_fractionalPart = 0;
+  bool isPositive = true;
+  getTemperature(&airData, &T_intPart, &T_fractionalPart, &isPositive);
+  sprintf(postBuffer,"{\"temperature\":%u.%u,\n", T_intPart, T_fractionalPart);
 
 #ifdef DALLAS
-  if(temperature1 != DEVICE_DISCONNECTED_C) {
-    sprintf(fieldBuffer, "\"temp1\":%5.2f,\n", temperature1);
-    strcat(postBuffer, fieldBuffer);
-  }
-  if(temperature2 != DEVICE_DISCONNECTED_C) {
-    sprintf(fieldBuffer, "\"temp2\":%5.2f,\n", temperature2);
-    strcat(postBuffer, fieldBuffer);
-  }
-  if(temperature3 != DEVICE_DISCONNECTED_C) {
-    sprintf(fieldBuffer, "\"temp3\":%5.2f,\n", temperature3);
-    strcat(postBuffer, fieldBuffer);
+  // preamble
+  strcat(postBuffer, "\"dallas\":{\n");
+
+  char output[DeviceAddressStringLength];
+  for (int index = 0; index < dallasDeviceCount; index++) {
+    float temp = temperatures[index];
+    if(temp != DEVICE_DISCONNECTED_C) {
+      sprintf(fieldBuffer, "\"%s\":%5.2f,\n", addressToString(thermometers[index], &output), temp);
+      strcat(postBuffer, fieldBuffer);
+    }
   }
 
+  // postamble
+  strcat(postBuffer, "},\n");
 #endif
     // https://stackoverflow.com/questions/45922817/what-is-unquoted-priu32-in-printf-in-c
     
