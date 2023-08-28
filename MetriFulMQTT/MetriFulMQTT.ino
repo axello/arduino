@@ -26,7 +26,7 @@
   once every couple of hours, disable the DS18b20 for a while
   then enable; to reset them.
   when buffer is too full, return an error state in an MQTT message with the buffer size
-
+  does MQTT actually support hierarchical JSON? My MQTT Explorer does not recognise any JSON when the 'dallas' object is added.
 */
 
 #include "secrets.h"
@@ -60,9 +60,21 @@ char SSID[] = WIFI_SSID; // network SSID (name)
 char password[] = WIFI_PASSWORD; // network password
 
 // The details of the MQTT PUBLISHER:
-#define NODENAME oranjeslaap
-#define MQTT_FEED "metriful/oranjeslaap/tele"
-#define MQTT_STATE "metriful/oranjeslaap/state"
+// #define NODENAME oranjeslaap
+// #define MQTT_FEED "metriful/oranjeslaap/tele"
+// #define MQTT_STATE "metriful/oranjeslaap/state"
+
+// #define NODENAME puckslaap
+// #define MQTT_FEED "metriful/puckslaap/tele"
+// #define MQTT_STATE "metriful/puckslaap/state"
+
+// #define NODENAME keuken
+// #define MQTT_FEED "metriful/keuken/tele"
+// #define MQTT_STATE "metriful/keuken/state"
+
+#define NODENAME "zolder"
+#define MQTT_FEED "metriful/zolder/tele"
+#define MQTT_STATE "metriful/zolder/state"
 
 // Define DALLAS for 1 ds18b20, or DALLAS2 for 2 dallas
 #define DALLAS
@@ -115,7 +127,7 @@ DallasTemperature temp_sensors(&oneWire);
 char thermometers[MAXTHERMOMETERS][DeviceAddressStringLength];
 float temperatures[MAXTHERMOMETERS];
 
-int dallasDeviceCount;
+uint8_t dallasDeviceCount;
 #endif
 enum Status { error, ok , nodallas};
 
@@ -244,13 +256,15 @@ void setup() {
   // Initialize the host's pins, set up the serial port and reset:
   Serial.begin(SERIAL_BAUD_RATE);
 
+  Serial.print("Node: ");
+  Serial.println(NODENAME);
   Serial.print("interupt on: GPIO");
   Serial.println(S_INT_PIN);
 
 #ifdef DALLAS
   pinMode(DS_ENABLE_PIN, OUTPUT);
   digitalWrite(DS_ENABLE_PIN, HIGH);
-  for (int index = 0; index < MAXTHERMOMETERS; index++) {
+  for (uint8_t index = 0; index < MAXTHERMOMETERS; index++) {
     temperatures[index] = DEVICE_DISCONNECTED_C;
     strncpy(thermometers[index], EMPTYTHERMOMETER, 17);
   }
@@ -378,7 +392,7 @@ void post_MQTT(void) {
   uint8_t T_fractionalPart = 0;
   bool isPositive = true;
   getTemperature(&airData, &T_intPart, &T_fractionalPart, &isPositive);
-  sprintf(postBuffer,"{\"temperature\":%u.%u,\n", T_intPart, T_fractionalPart);
+  sprintf(postBuffer,"{\n\"temperature\":%u.%u,\n", T_intPart, T_fractionalPart);
 
 #ifdef DALLAS
   // preamble
