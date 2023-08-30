@@ -71,7 +71,7 @@ char password[] = WIFI_PASSWORD; // network password
 // #define MQTT_FEED "metriful/puckslaap/tele"
 // #define MQTT_STATE "metriful/puckslaap/state"
 
-// #define NODENAME keuken
+// #define NODENAME "keuken"
 // #define MQTT_FEED "metriful/keuken/tele"
 // #define MQTT_STATE "metriful/keuken/state"
 
@@ -79,7 +79,7 @@ char password[] = WIFI_PASSWORD; // network password
 #define MQTT_FEED "metriful/zolder/tele"
 #define MQTT_STATE "metriful/zolder/state"
 
-// Define DALLAS for 1 ds18b20, or DALLAS2 for 2 dallas
+// Define DALLAS to read one or multiple ds18b20 temperature sensors
 #define DALLAS
 
 #ifdef DALLAS
@@ -87,6 +87,8 @@ char password[] = WIFI_PASSWORD; // network password
 #define DS_ENABLE_PIN D5     // labeled D5
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
+
+#define VERSION "20230830a"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -259,6 +261,8 @@ void setup() {
   Serial.println(NODENAME);
   Serial.print("interupt on: GPIO");
   Serial.println(S_INT_PIN);
+  Serial.print("Version: ");
+  Serial.println(VERSION);
 
 #ifdef DALLAS
   pinMode(DS_ENABLE_PIN, OUTPUT);
@@ -309,7 +313,8 @@ void loop() {
 
   /* Read DS18B20 extra temperature data */
 #ifdef DALLAS
-  digitalWrite(DS_ENABLE_PIN, 1);
+  digitalWrite(DS_ENABLE_PIN, HIGH);
+  delay(100);
   temp_sensors.requestTemperatures();
 #endif
 
@@ -351,6 +356,7 @@ void loop() {
 
 #ifdef DALLAS
   fetchTemperatures();
+  digitalWrite(DS_ENABLE_PIN, LOW);
 #endif
 
   // Check that WiFi is still connected
