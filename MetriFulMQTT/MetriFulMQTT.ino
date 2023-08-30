@@ -98,20 +98,18 @@ char password[] = WIFI_PASSWORD; // network password
 WiFiClient client;
 
 // Buffers for assembling MQTT requests
-char __attribute__((aligned(4))) postBuffer[MAXBUFFERSIZE];
-char __attribute__((aligned(4))) fieldBuffer[70];
-// char __attribute__((aligned(4)) postBuffer[MAXBUFFERSIZE];
-// char __attribute__((aligned(4)) fieldBuffer[70];
+char postBuffer[MAXBUFFERSIZE];
+char fieldBuffer[70];
 
 unsigned long nextTicks = 0;
 #define bleep_interval 300
 
 // Structs for data
-AirData_t __attribute__((aligned(4))) airData = {0};
-AirQualityData_t __attribute__((aligned(4))) airQualityData = {0};
-LightData_t __attribute__((aligned(4))) lightData = {0}; 
-ParticleData_t __attribute__((aligned(4))) particleData = {0};
-SoundData_t __attribute__((aligned(4))) soundData = {0};
+AirData_t airData = {0};
+AirQualityData_t airQualityData = {0};
+LightData_t lightData = {0}; 
+ParticleData_t particleData = {0};
+SoundData_t soundData = {0};
 
 // MQTT
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
@@ -129,7 +127,7 @@ DallasTemperature temp_sensors(&oneWire);
 
 // arrays to hold device addresses
 #define MAXTHERMOMETERS 5
-char __attribute__((aligned(4))) thermometers[MAXTHERMOMETERS][DeviceAddressStringLength];
+char thermometers[MAXTHERMOMETERS][DeviceAddressStringLength];
 float temperatures[MAXTHERMOMETERS];
 
 uint8_t dallasDeviceCount;
@@ -155,17 +153,12 @@ void post_MQTT_state(Status state) {
     const char* postBuf = input.c_str();
     // postBuffer[json.length()] = '\0';
 
-  Serial.print("post mqtt 1 … ");
     size_t len = strlen(postBuf);
-    // Serial.println(len);
-    Serial.print(len);
+    Serial.println(len);
     postBuffer[len] = '\0';
-Serial.print("post mqtt 2 …");
     if (!statePublisher.publish(postBuf, len)) {
       // Serial.println("Could not send mqtt.");
     }
-  Serial.print("post mqtt 3 …");
-
 }
 
 void searchOneWireDevices() {
@@ -259,8 +252,6 @@ void fetchTemperatures()
 * 
 *******************************************************************/
 void setup() {
-  // Serial.begin(SERIAL_BAUD_RATE);
-
   // Initialize the host's pins, set up the serial port and reset:
   Serial.begin(SERIAL_BAUD_RATE);
 
@@ -281,22 +272,24 @@ void setup() {
 #else
   Serial.println("NO DALLAS\n");
 #endif
-  Serial.print("setup stage 1");
   connectToWiFi(SSID, password);
   
-  Serial.print("setup stage 2");
   // Apply chosen settings to the MS430
   uint8_t particleSensor = PARTICLE_SENSOR;
   TransmitI2C(I2C_ADDRESS, PARTICLE_SENSOR_SELECT_REG, &particleSensor, 1);
   TransmitI2C(I2C_ADDRESS, CYCLE_TIME_PERIOD_REG, &cycle_period, 1);
 
   SensorHardwareSetup(I2C_ADDRESS);
-  Serial.print("setup stage 3");
   // Enter cycle mode
   ready_assertion_event = false;
   TransmitI2C(I2C_ADDRESS, CYCLE_MODE_CMD, 0, 0);
 
   nextTicks = millis() + bleep_interval;
+
+  // check if library updated and devolved to its default settings
+  if (MAXBUFFERSIZE < 500) {
+    Serial.println("!!! Warning: buffersize too small (did you update Adafruit's MQTT library?)");
+  }
 }
 
 /*******************************************************************
@@ -313,15 +306,12 @@ void loop() {
   ready_assertion_event = false;
 
   MQTT_connect();
-  Serial.print("LOOP connected…");
 
   /* Read DS18B20 extra temperature data */
 #ifdef DALLAS
   digitalWrite(DS_ENABLE_PIN, 1);
   temp_sensors.requestTemperatures();
 #endif
-
-  Serial.print("LOOP stage 2…");
 
   /* Read data from the MS430 into the data structs. 
   For each category of data (air, sound, etc.) a pointer to the data struct is 
@@ -362,7 +352,6 @@ void loop() {
 #ifdef DALLAS
   fetchTemperatures();
 #endif
-  Serial.print("LOOP stage 3…");
 
   // Check that WiFi is still connected
   uint8_t wifiStatus = WiFi.status();
@@ -373,11 +362,9 @@ void loop() {
     connectToWiFi(SSID, password);
     ready_assertion_event = false;
   }
-  Serial.print("LOOP stage 4…");
 
   post_MQTT();
   // toggle_LED();
-  Serial.print("LOOP stage 5…");
 
 }
 
@@ -409,12 +396,8 @@ void post_MQTT(void) {
   uint8_t T_fractionalPart = 0;
   bool isPositive = true;
 
-  Serial.println("");
-  Serial.print("mqtt 1 …");
-
   getTemperature(&airData, &T_intPart, &T_fractionalPart, &isPositive);
   sprintf(postBuffer,"{\n\"temperature\":%u.%u,\n", T_intPart, T_fractionalPart);
-  Serial.print("mqtt 2 …");
 
 #ifdef DALLAS
   // preamble
@@ -427,13 +410,11 @@ void post_MQTT(void) {
       strcat(postBuffer, fieldBuffer);
     }
   }
-  Serial.print("mqtt 3 …");
 
   // postamble
   strcat(postBuffer, "},\n");
 #endif
     // https://stackoverflow.com/questions/45922817/what-is-unquoted-priu32-in-printf-in-c
-  Serial.print("mqtt 4 …");
 
     sprintf(fieldBuffer, "\"pressure\":%" PRIu32 ",\n", airData.P_Pa);
     strcat(postBuffer, fieldBuffer);
@@ -469,26 +450,23 @@ void post_MQTT(void) {
     sprintf(fieldBuffer,"\"illuminance\":%u.%02u,\n", 
             lightData.illum_lux_int, lightData.illum_lux_fr_2dp);
     strcat(postBuffer, fieldBuffer);
-  Serial.print("mqtt 5 …");
 
     // show rest of buffer length minus offset
     size_t len = MAXBUFFERSIZE - (strlen(postBuffer) + 15);
     sprintf(fieldBuffer,"\"rest_buf\":%u\n", len);
     strcat(postBuffer, fieldBuffer);
     strcat(postBuffer, "}");
- Serial.print("mqtt 6 …");
 
     len = strlen(postBuffer);
     // Serial.println(len);
     postBuffer[len] = '\0';
     // Serial.print(" : ");
     // Serial.print(postBuffer);
-    uint8_t __attribute__((aligned(4)))  *otherBuffer = (uint8_t*) postBuffer;
+    uint8_t *otherBuffer = (uint8_t*) postBuffer;
 
     if (!feedPublisher.publish(otherBuffer, len)) {
       Serial.println("Could not send mqtt.");
     }
-     Serial.print("mqtt 7 …");
 
     // client.println(fieldBuffer);
     // client.println();
