@@ -65,22 +65,23 @@ uint8_t cycle_period = CYCLE_PERIOD_100_S;
 char SSID[] = WIFI_SSID; // network SSID (name)
 char password[] = WIFI_PASSWORD; // network password
 
+/*******************************************************************
+*
+*     MQTT SETUP
+* 
+*******************************************************************/
 // The details of the MQTT PUBLISHER:
-// #define NODENAME oranjeslaap
-// #define MQTT_FEED "metriful/oranjeslaap/tele"
-// #define MQTT_STATE "metriful/oranjeslaap/state"
+#define MQTT_TOPIC "metriful/"
+#define MQTT_FEED_POST "/tele"
+#define MQTT_STATE_POST "/state"
 
-// #define NODENAME puckslaap
-// #define MQTT_FEED "metriful/puckslaap/tele"
-// #define MQTT_STATE "metriful/puckslaap/state"
-
+///// NODES //////////////////////////////////////////////////
+// #define NODENAME "oranjeslaap"
+// #define NODENAME "puckslaap"
 // #define NODENAME "keuken"
-// #define MQTT_FEED "metriful/keuken/tele"
-// #define MQTT_STATE "metriful/keuken/state"
-
 #define NODENAME "zolder"
-#define MQTT_FEED "metriful/zolder/tele"
-#define MQTT_STATE "metriful/zolder/state"
+
+/*******************************************************************/
 
 // Define DALLAS to read one or multiple ds18b20 temperature sensors
 #define DALLAS
@@ -91,7 +92,7 @@ char password[] = WIFI_PASSWORD; // network password
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
 
-#define VERSION "20230914b"
+#define VERSION "20230914d"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -119,8 +120,8 @@ SoundData_t soundData = {0};
 // MQTT
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
 Adafruit_MQTT_Client mqtt(&client, MQTT_SERVER, MQTT_SERVERPORT);
-Adafruit_MQTT_Publish feedPublisher = Adafruit_MQTT_Publish(&mqtt, MQTT_FEED);
-Adafruit_MQTT_Publish statePublisher = Adafruit_MQTT_Publish(&mqtt, MQTT_STATE);
+Adafruit_MQTT_Publish feedPublisher  = Adafruit_MQTT_Publish(&mqtt, MQTT_TOPIC NODENAME MQTT_FEED_POST );
+Adafruit_MQTT_Publish statePublisher = Adafruit_MQTT_Publish(&mqtt, MQTT_TOPIC NODENAME MQTT_STATE_POST );
 
 // DALLAS DS18B20
 #ifdef DALLAS
@@ -148,7 +149,7 @@ void post_MQTT_state(Status state) {
         input = "{\"status\": \"ERROR\"}";
         break;
       case ok:
-        input = "{\"status\": \"OK\"}";
+        input = "{\"status\":\"OK\", \"version\":\"" VERSION "\"}";
         break;
       case nodallas:
         input = "{\"status\": \"NO DALLAS DEVICE DETECTED\"}";
@@ -169,7 +170,7 @@ void post_MQTT_state(Status state) {
  
  //                 bool publish(uint8_t *b, uint16_t bLen, bool retain = false);
     if (!statePublisher.publish((uint8_t *)postBuf, len, retained)) {      // retain message if OK
-      // Serial.println("Could not send mqtt.");
+      Serial.println("Could not send state mqtt.");
     }
 }
 
@@ -287,7 +288,8 @@ void setupOTA() {
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
   });
   ArduinoOTA.setHostname(NODENAME);
-  
+  ArduinoOTA.setPassword(OTA_PASSWORD);
+
   ArduinoOTA.begin();
   Serial.println("Ready");
   Serial.print("IP address: ");
@@ -310,6 +312,9 @@ void setup() {
   Serial.print("Version: ");
   Serial.println(VERSION);
 
+  connectToWiFi(SSID, password);
+  MQTT_connect();
+
 #ifdef DALLAS
   pinMode(DS_ENABLE_PIN, OUTPUT);
   digitalWrite(DS_ENABLE_PIN, HIGH);
@@ -322,7 +327,6 @@ void setup() {
 #else
   Serial.println("NO DALLAS\n");
 #endif
-  connectToWiFi(SSID, password);
   
   // Apply chosen settings to the MS430
   uint8_t particleSensor = PARTICLE_SENSOR;
@@ -522,7 +526,7 @@ void post_MQTT(void) {
   uint8_t *otherBuffer = (uint8_t *)postBuffer;
 
   if (!feedPublisher.publish(otherBuffer, len)) {
-    Serial.println("Could not send mqtt.");
+    Serial.println("Could not send feed mqtt.");
   }
 
   ArduinoOTA.handle();
