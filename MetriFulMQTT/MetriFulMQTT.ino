@@ -26,7 +26,8 @@
   √ once every couple of hours, disable the DS18b20 for a while
   √ then enable; to reset them.
   when buffer is too full, return an error state in an MQTT message with the buffer size
-  does MQTT actually support hierarchical JSON? My MQTT Explorer does not recognise any JSON when the 'dallas' object is added. (-> this was because of poorly formatted JSON)
+  √ does MQTT actually support hierarchical JSON? My MQTT Explorer does not recognise any JSON when the 'dallas' object is added. (-> this was because of poorly formatted JSON)
+  √ Enable OTA updates
 */
 
 /* NOTA BENE
@@ -34,8 +35,8 @@
   *** override Adafruit_MQTT buffer size! ***
   (Can't do that here, do it in Adafruit_MQTT.h)
   #define MAXBUFFERSIZE (500)
-
  */
+
 #include "secrets.h"
 #include "Metriful_sensor.h"
 #include "WiFi_functions.h"
@@ -46,6 +47,8 @@
 #include "sensor_constants.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <ArduinoOTA.h>
+
 
 void MQTT_connect();
 
@@ -88,7 +91,7 @@ char password[] = WIFI_PASSWORD; // network password
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
 
-#define VERSION "20230914a"
+#define VERSION "20230914b"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -259,6 +262,38 @@ void fetchTemperatures()
     // }
   }
 }
+
+/*******************************************************************
+*
+*     OTA
+* 
+*******************************************************************/
+void setupOTA() {
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start OTA");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd OTA");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.setHostname(NODENAME);
+  
+  ArduinoOTA.begin();
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
 /*******************************************************************
 *
 *     SETUP
@@ -305,6 +340,7 @@ void setup() {
   if (MAXBUFFERSIZE < 500) {
     Serial.println("!!! Warning: buffersize too small (did you update Adafruit's MQTT library?)");
   }
+  setupOTA();
 }
 
 /*******************************************************************
@@ -437,58 +473,59 @@ void post_MQTT(void) {
 #endif
     // https://stackoverflow.com/questions/45922817/what-is-unquoted-priu32-in-printf-in-c
 
-    sprintf(fieldBuffer, "\"pressure\":%" PRIu32 ",\n", airData.P_Pa);
-    strcat(postBuffer, fieldBuffer);
-    
-    sprintf(fieldBuffer,"\"humidity\":%u.%u,\n", 
-            airData.H_pc_int, airData.H_pc_fr_1dp);
-    strcat(postBuffer, fieldBuffer);
-    
-    sprintf(fieldBuffer,"\"aqi\":%u.%u,\n", 
-            airQualityData.AQI_int, airQualityData.AQI_fr_1dp);
-    strcat(postBuffer, fieldBuffer);
-    
-    sprintf(fieldBuffer,"\"aqi_string\":\"%s\",\n", 
-            interpret_AQI_value(airQualityData.AQI_int));
-    strcat(postBuffer, fieldBuffer);
-    
-    sprintf(fieldBuffer,"\"bvoc\":%u.%02u,\n", 
-            airQualityData.bVOC_int, airQualityData.bVOC_fr_2dp);
-    strcat(postBuffer, fieldBuffer);
-    
-    sprintf(fieldBuffer,"\"spl\":%u.%u,\n", 
-            soundData.SPL_dBA_int, soundData.SPL_dBA_fr_1dp);
-    strcat(postBuffer, fieldBuffer);
+  sprintf(fieldBuffer, "\"pressure\":%" PRIu32 ",\n", airData.P_Pa);
+  strcat(postBuffer, fieldBuffer);
 
-    sprintf(fieldBuffer,"\"peak_amp\":%u.%02u,\n", 
-            soundData.peak_amp_mPa_int, soundData.peak_amp_mPa_fr_2dp);
-    strcat(postBuffer, fieldBuffer);
+  sprintf(fieldBuffer, "\"humidity\":%u.%u,\n",
+          airData.H_pc_int, airData.H_pc_fr_1dp);
+  strcat(postBuffer, fieldBuffer);
 
-    sprintf(fieldBuffer,"\"particulates\":%u.%02u,\n", 
-            particleData.concentration_int, particleData.concentration_fr_2dp);
-    strcat(postBuffer, fieldBuffer);
-    
-    sprintf(fieldBuffer,"\"illuminance\":%u.%02u,\n", 
-            lightData.illum_lux_int, lightData.illum_lux_fr_2dp);
-    strcat(postBuffer, fieldBuffer);
+  sprintf(fieldBuffer, "\"aqi\":%u.%u,\n",
+          airQualityData.AQI_int, airQualityData.AQI_fr_1dp);
+  strcat(postBuffer, fieldBuffer);
 
-    // show rest of buffer length minus offset
-    size_t len = MAXBUFFERSIZE - (strlen(postBuffer) + 15);
-    sprintf(fieldBuffer,"\"rest_buf\":%u\n", len);
-    strcat(postBuffer, fieldBuffer);
-    strcat(postBuffer, "}");
+  sprintf(fieldBuffer, "\"aqi_string\":\"%s\",\n",
+          interpret_AQI_value(airQualityData.AQI_int));
+  strcat(postBuffer, fieldBuffer);
 
-    len = strlen(postBuffer);
-    // Serial.println(len);
-    postBuffer[len] = '\0';
-    // Serial.print(" : ");
-    // Serial.print(postBuffer);
-    uint8_t *otherBuffer = (uint8_t*) postBuffer;
+  sprintf(fieldBuffer, "\"bvoc\":%u.%02u,\n",
+          airQualityData.bVOC_int, airQualityData.bVOC_fr_2dp);
+  strcat(postBuffer, fieldBuffer);
 
-    if (!feedPublisher.publish(otherBuffer, len)) {
-      Serial.println("Could not send mqtt.");
-    }
+  sprintf(fieldBuffer, "\"spl\":%u.%u,\n",
+          soundData.SPL_dBA_int, soundData.SPL_dBA_fr_1dp);
+  strcat(postBuffer, fieldBuffer);
 
+  sprintf(fieldBuffer, "\"peak_amp\":%u.%02u,\n",
+          soundData.peak_amp_mPa_int, soundData.peak_amp_mPa_fr_2dp);
+  strcat(postBuffer, fieldBuffer);
+
+  sprintf(fieldBuffer, "\"particulates\":%u.%02u,\n",
+          particleData.concentration_int, particleData.concentration_fr_2dp);
+  strcat(postBuffer, fieldBuffer);
+
+  sprintf(fieldBuffer, "\"illuminance\":%u.%02u,\n",
+          lightData.illum_lux_int, lightData.illum_lux_fr_2dp);
+  strcat(postBuffer, fieldBuffer);
+
+  // show rest of buffer length minus offset
+  size_t len = MAXBUFFERSIZE - (strlen(postBuffer) + 15);
+  sprintf(fieldBuffer, "\"rest_buf\":%u\n", len);
+  strcat(postBuffer, fieldBuffer);
+  strcat(postBuffer, "}");
+
+  len = strlen(postBuffer);
+  // Serial.println(len);
+  postBuffer[len] = '\0';
+  // Serial.print(" : ");
+  // Serial.print(postBuffer);
+  uint8_t *otherBuffer = (uint8_t *)postBuffer;
+
+  if (!feedPublisher.publish(otherBuffer, len)) {
+    Serial.println("Could not send mqtt.");
+  }
+
+  ArduinoOTA.handle();
     // client.println(fieldBuffer);
     // client.println();
     // client.print(postBuffer);
