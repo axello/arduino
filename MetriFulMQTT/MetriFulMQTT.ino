@@ -88,7 +88,7 @@ char password[] = WIFI_PASSWORD; // network password
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
 
-#define VERSION "20230913a"
+#define VERSION "20230914a"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -134,10 +134,12 @@ float temperatures[MAXTHERMOMETERS];
 
 uint8_t dallasDeviceCount;
 #endif
-enum Status { error, ok , nodallas};
+enum Status { error, ok , nodallas, tooManyDallas};
 
 void post_MQTT_state(Status state) {
     String input;
+    bool retained = true;
+
     switch(state) {
       case error: 
         input = "{\"status\": \"ERROR\"}";
@@ -147,6 +149,9 @@ void post_MQTT_state(Status state) {
         break;
       case nodallas:
         input = "{\"status\": \"NO DALLAS DEVICE DETECTED\"}";
+        break;
+      case tooManyDallas:
+        input = "{\"status\": \"MORE THAN 5 DALLAS DEVICES DETECTED\"}";
         break;
       default:
         input = "{\"status\": \"Serious error\"}";
@@ -158,13 +163,16 @@ void post_MQTT_state(Status state) {
     size_t len = strlen(postBuf);
     Serial.println(len);
     postBuffer[len] = '\0';
-    if (!statePublisher.publish(postBuf, len)) {
+ 
+ //                 bool publish(uint8_t *b, uint16_t bLen, bool retain = false);
+    if (!statePublisher.publish((uint8_t *)postBuf, len, retained)) {      // retain message if OK
       // Serial.println("Could not send mqtt.");
     }
 }
 
 void searchOneWireDevices() {
   temp_sensors.begin();
+  uint8_t tooManyDallasDeviceCount = 0;
 
     // locate devices on the bus
   Serial.print("\nLocating devices...");
@@ -173,12 +181,15 @@ void searchOneWireDevices() {
   Serial.print(dallasDeviceCount, DEC);
   Serial.println(" devices.");
   if (dallasDeviceCount > MAXTHERMOMETERS) {
-    Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");
+    Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");\
+    tooManyDallasDeviceCount = dallasDeviceCount;
     dallasDeviceCount = MAXTHERMOMETERS;
   }
 
   if (dallasDeviceCount == 0) {
     post_MQTT_state(nodallas);
+  } else if (tooManyDallasDeviceCount > 0) {
+    post_MQTT_state(tooManyDallas);
   } else {
     post_MQTT_state(ok);
   }
