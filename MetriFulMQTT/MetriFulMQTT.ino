@@ -23,10 +23,10 @@
 */
 
 /* FUTURE
-  once every couple of hours, disable the DS18b20 for a while
-  then enable; to reset them.
+  √ once every couple of hours, disable the DS18b20 for a while
+  √ then enable; to reset them.
   when buffer is too full, return an error state in an MQTT message with the buffer size
-  does MQTT actually support hierarchical JSON? My MQTT Explorer does not recognise any JSON when the 'dallas' object is added.
+  does MQTT actually support hierarchical JSON? My MQTT Explorer does not recognise any JSON when the 'dallas' object is added. (-> this was because of poorly formatted JSON)
 */
 
 /* NOTA BENE
@@ -88,7 +88,7 @@ char password[] = WIFI_PASSWORD; // network password
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
 
-#define VERSION "20230830a"
+#define VERSION "20230913a"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -412,7 +412,11 @@ void post_MQTT(void) {
   for (int index = 0; index < dallasDeviceCount; index++) {
     float temp = temperatures[index];
     if(temp != DEVICE_DISCONNECTED_C) {
-      sprintf(fieldBuffer, "\"%s\":%5.2f,\n", thermometers[index], temp);
+      if (index == (dallasDeviceCount - 1)) {
+        sprintf(fieldBuffer, "\"%s\":%5.2f\n", thermometers[index], temp);
+      } else {
+        sprintf(fieldBuffer, "\"%s\":%5.2f,\n", thermometers[index], temp);
+      }
       strcat(postBuffer, fieldBuffer);
     }
   }
