@@ -33,7 +33,7 @@ void SensorHardwareSetup(uint8_t i2c_7bit_address) {
   Wire.setClock(I2C_CLK_FREQ_HZ);
 
   // READY, light interrupt and sound interrupt lines are digital inputs.
-  pinMode(READY_PIN, INPUT);
+  pinMode(READY_PIN, INPUT_PULLUP);
   pinMode(L_INT_PIN, INPUT);
   pinMode(S_INT_PIN, INPUT);
 

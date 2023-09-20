@@ -48,6 +48,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <ArduinoOTA.h>
+#include <ArduinoJson.h>
 
 
 void MQTT_connect();
@@ -80,7 +81,7 @@ char password[] = WIFI_PASSWORD; // network password
 // #define NODENAME "oranjeslaap"
 // #define NODENAME "puckslaap"
 // #define NODENAME "keuken"
-#define NODENAME "zolder"
+// #define NODENAME "zolder"
 
 /*******************************************************************/
 
@@ -107,9 +108,12 @@ WiFiClient client;
 // Buffers for assembling MQTT requests
 char postBuffer[MAXBUFFERSIZE];
 char fieldBuffer[70];
+DynamicJsonDocument doc(MAXBUFFERSIZE);
 
 unsigned long nextTicks = 0;
 #define bleep_interval 300
+// update interval every 60 seconds, change this to deepsleep later!
+#define update_interval 60000
 
 // Structs for data
 AirData_t airData = {0};
@@ -141,12 +145,13 @@ uint8_t dallasDeviceCount;
 #endif
 enum Status { error, ok , nodallas, tooManyDallas};
 
+
 /*******************************************************************
 *
 * Post the stateful state of this app
 * 
 *******************************************************************/
-void post_MQTT_state(Status state) {
+void publish_MQTT_state(Status state) {
     String input;
     bool retained = true;
     IPAddress hostip = WiFi.localIP();
@@ -181,40 +186,57 @@ void post_MQTT_state(Status state) {
     }
 }
 
-void searchOneWireDevices() {
+void publishDallasState(int dallasDeviceCount, int tooManyDallasDeviceCount) {
+  if (dallasDeviceCount == 0) {
+    publish_MQTT_state(nodallas);
+  } else if (tooManyDallasDeviceCount > 0) {
+    publish_MQTT_state(tooManyDallas);
+  } else {
+    publish_MQTT_state(ok);
+  }
+}
+
+void debugParasitePower(bool debug) {
+  if (debug) {
+    // report parasite power requirements
+    Serial.print("Parasite OneWire power is: ");
+    if (temp_sensors.isParasitePowerMode()) {
+      Serial.println("ON");
+    } else {
+      Serial.println("OFF");
+    }
+  }
+}
+
+void searchOneWireDevices(bool debug) {
   temp_sensors.begin();
   uint8_t tooManyDallasDeviceCount = 0;
 
-    // locate devices on the bus
-  Serial.print("\nLocating devices...");
-  Serial.print("Found ");
+  if (debug) {
+      // locate devices on the bus
+    Serial.print("\nLocating devices...");
+  }
+
   dallasDeviceCount = temp_sensors.getDeviceCount();
-  Serial.print(dallasDeviceCount, DEC);
-  Serial.println(" devices.");
+  if (debug) {
+    Serial.print("Found ");
+    Serial.print(dallasDeviceCount, DEC);
+    Serial.println(" devices.");
+  }
+
   if (dallasDeviceCount > MAXTHERMOMETERS) {
-    Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");\
+    if (debug) {
+      Serial.println("Device count is bigger than predefined array! [MAXTHERMOMETERS]");\
+    }
     tooManyDallasDeviceCount = dallasDeviceCount;
     dallasDeviceCount = MAXTHERMOMETERS;
   }
 
-  if (dallasDeviceCount == 0) {
-    post_MQTT_state(nodallas);
-  } else if (tooManyDallasDeviceCount > 0) {
-    post_MQTT_state(tooManyDallas);
-  } else {
-    post_MQTT_state(ok);
-  }
-
-  // report parasite power requirements
-  Serial.print("Parasite OneWire power is: ");
-  if (temp_sensors.isParasitePowerMode()) {
-    Serial.println("ON");
-  } else {
-    Serial.println("OFF");
-  }
-
+  publishDallasState(dallasDeviceCount, tooManyDallasDeviceCount);
+  debugParasitePower(debug);
   // search
   oneWire.reset_search();
+
   int index = 0;
   char buffer[DeviceAddressStringLength];
   char *ptr = &buffer[0];
@@ -222,11 +244,13 @@ void searchOneWireDevices() {
   DeviceAddress tempThermo;
   while (index < dallasDeviceCount && oneWire.search(tempThermo)) {
     addressToString(tempThermo, thermometers[index]);
-    printDevice(index, tempThermo);
+    if (debug) {
+      printDevice(index, tempThermo);
+    }
     index++;
   }
 
-  if (index < dallasDeviceCount) {
+  if (debug && index < dallasDeviceCount) {
     Serial.println("Did not store all detected Onewire devices.");
   }
 }
@@ -329,7 +353,7 @@ void setup() {
     temperatures[index] = DEVICE_DISCONNECTED_C;
     strncpy(thermometers[index], EMPTYTHERMOMETER, 17);
   }
-  searchOneWireDevices();
+  searchOneWireDevices(true);
   delay(100);
 #else
   Serial.println("NO DALLAS\n");
@@ -354,34 +378,13 @@ void setup() {
   setupOTA();
 }
 
-/*******************************************************************
-*
-*     LOOP
-* 
-*******************************************************************/
-void loop() {
-
-  // Wait for the next new data release, indicated by a falling edge on READY
-  while (!ready_assertion_event) {
-    yield();
-  }
-  ready_assertion_event = false;
-
-  MQTT_connect();
-
-  /* Read DS18B20 extra temperature data */
-#ifdef DALLAS
-  digitalWrite(DS_ENABLE_PIN, HIGH);
-  delay(100);
-  temp_sensors.requestTemperatures();
-#endif
-
-  /* Read data from the MS430 into the data structs. 
-  For each category of data (air, sound, etc.) a pointer to the data struct is 
-  passed to the ReceiveI2C() function. The received byte sequence fills the 
-  struct in the correct order so that each field within the struct receives
-  the value of an environmental quantity (temperature, sound level, etc.)
-  */ 
+/* Read data from the MS430 into the data structs. 
+For each category of data (air, sound, etc.) a pointer to the data struct is 
+passed to the ReceiveI2C() function. The received byte sequence fills the 
+struct in the correct order so that each field within the struct receives
+the value of an environmental quantity (temperature, sound level, etc.)
+*/ 
+void readMetriful() {
   
   // Air data
   // Choose output temperature unit (C or F) in Metriful_sensor.h
@@ -411,28 +414,55 @@ void loop() {
   if (PARTICLE_SENSOR != PARTICLE_SENSOR_OFF) {
     ReceiveI2C(I2C_ADDRESS, PARTICLE_DATA_READ, (uint8_t *) &particleData, PARTICLE_DATA_BYTES);
   }
-
-#ifdef DALLAS
-  fetchTemperatures();
-  digitalWrite(DS_ENABLE_PIN, LOW);
-#endif
-
-  // Check that WiFi is still connected
-  uint8_t wifiStatus = WiFi.status();
-  if (wifiStatus != WL_CONNECTED) {
-    // There is a problem with the WiFi connection: attempt to reconnect.
-    Serial.print("Wifi status: ");
-    Serial.println(interpret_WiFi_status(wifiStatus));
-    connectToWiFi(SSID, password);
-    ready_assertion_event = false;
-  }
-
-  post_MQTT();
-  // toggle_LED();
-
 }
 
-void toggle_LED(void) {
+/*******************************************************************
+*
+*     LOOP
+* 
+*******************************************************************/
+void loop() {
+
+  // Wait for the next new data release, indicated by a falling edge on READY
+  while (!ready_assertion_event) {
+    yield();
+  }
+  ready_assertion_event = false;
+
+  if (millis() > nextTicks) {
+    nextTicks = millis() + update_interval;
+    MQTT_connect();
+
+    /* Read DS18B20 extra temperature data */
+  #ifdef DALLAS
+    digitalWrite(DS_ENABLE_PIN, HIGH);
+    searchOneWireDevices(false);
+    delay(100);
+    temp_sensors.requestTemperatures();
+  #endif
+    readMetriful();
+
+  #ifdef DALLAS
+    fetchTemperatures();
+    digitalWrite(DS_ENABLE_PIN, LOW);
+  #endif
+
+    // Check that WiFi is still connected
+    uint8_t wifiStatus = WiFi.status();
+    if (wifiStatus != WL_CONNECTED) {
+      // There is a problem with the WiFi connection: attempt to reconnect.
+      Serial.print("Wifi status: ");
+      Serial.println(interpret_WiFi_status(wifiStatus));
+      connectToWiFi(SSID, password);
+      ready_assertion_event = false;
+    }
+
+    post_MQTT();
+  }
+  // toggle_Debug_LED();
+}
+
+void toggle_Debug_LED(void) {
   if (millis() > nextTicks) {
     digitalWrite(DS_ENABLE_PIN, !digitalRead(DS_ENABLE_PIN));
     nextTicks = millis() + bleep_interval;
