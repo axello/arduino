@@ -94,7 +94,7 @@ char password[] = WIFI_PASSWORD; // network password
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
 
-#define VERSION "20230914d"
+#define VERSION "20230920b"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -459,6 +459,8 @@ void loop() {
 
     post_MQTT();
   }
+
+  ArduinoOTA.handle();
   // toggle_Debug_LED();
 }
 
@@ -571,7 +573,6 @@ void post_MQTT(void) {
     Serial.println("Could not send feed mqtt.");
   }
 
-  ArduinoOTA.handle();
     // client.println(fieldBuffer);
     // client.println();
     // client.print(postBuffer);
