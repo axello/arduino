@@ -76,6 +76,7 @@ char password[] = WIFI_PASSWORD; // network password
 #define MQTT_STATE_POST "/state"
 
 ///// NODES //////////////////////////////////////////////////
+#define NODENAME "UNDEFINED"
 // #define NODENAME "oranjeslaap"
 // #define NODENAME "puckslaap"
 // #define NODENAME "keuken"
@@ -140,16 +141,22 @@ uint8_t dallasDeviceCount;
 #endif
 enum Status { error, ok , nodallas, tooManyDallas};
 
+/*******************************************************************
+*
+* Post the stateful state of this app
+* 
+*******************************************************************/
 void post_MQTT_state(Status state) {
     String input;
     bool retained = true;
-
+    IPAddress hostip = WiFi.localIP();
+    
     switch(state) {
       case error: 
         input = "{\"status\": \"ERROR\"}";
         break;
       case ok:
-        input = "{\"status\":\"OK\", \"version\":\"" VERSION "\"}";
+        input = "{\"status\":\"OK\", \"version\":\"" VERSION "\", \"ip\":\"" + hostip.toString() + "\"}";
         break;
       case nodallas:
         input = "{\"status\": \"NO DALLAS DEVICE DETECTED\"}";
@@ -446,7 +453,12 @@ void toggle_LED(void) {
 10 Peak sound amplitude / mPa
 */ 
 
-// Assemble the data into the required format, then send it to the MQTT Publisher
+
+/*******************************************************************
+*
+* Assemble the data into the required format, then send it to the MQTT Publisher
+* 
+*******************************************************************/
 void post_MQTT(void) {
 
   uint8_t T_intPart = 0;
