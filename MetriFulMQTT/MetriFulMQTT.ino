@@ -94,7 +94,7 @@ char password[] = WIFI_PASSWORD; // network password
 #endif
 // #define ONE_WIRE_BUS_2 15   // labeled D8
 
-#define VERSION "20230920b"
+#define VERSION "20231012a"
 
 // END OF USER-EDITABLE SETTINGS
 //////////////////////////////////////////////////////////
@@ -288,10 +288,12 @@ void addressToString(DeviceAddress deviceAddress, char *stringBuf)
 void fetchTemperatures()
 {
   for (int index = 0; index < dallasDeviceCount; index++) {
-    temperatures[index] = temp_sensors.getTempCByIndex(index);
+    float tempC;
+    tempC = temp_sensors.getTempCByIndex(index);
     // DEVICE_DISCONNECTED_C (-127) is a perfectly valid and visible indication of something amiss.
-    // if(tempC != DEVICE_DISCONNECTED_C) {
-    // }
+    if(tempC != DEVICE_DISCONNECTED_C) {
+      temperatures[index] = tempC;
+    }
   }
 }
 
@@ -506,7 +508,7 @@ void post_MQTT(void) {
 
   for (int index = 0; index < dallasDeviceCount; index++) {
     float temp = temperatures[index];
-    if(temp != DEVICE_DISCONNECTED_C) {
+    if(temp != DEVICE_DISCONNECTED_C && temp < 84.0) {
       if (index == (dallasDeviceCount - 1)) {
         sprintf(fieldBuffer, "\"%s\":%5.2f\n", thermometers[index], temp);
       } else {
